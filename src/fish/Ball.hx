@@ -16,7 +16,7 @@ class Ball {
         this.s2d=s2d;
         g = new h2d.Graphics(parent);
 
-		g.beginFill(Std.int(0xFFFFFF*Math.random()), 0.5);
+		g.beginFill(Std.int(0xFFFFFF*Math.random()), 0.3);
 		g.lineStyle(1, 0xFF00FF);
 		g.drawCircle(0, 0, 30);
 		g.endFill();

@@ -1,9 +1,11 @@
 -cp src
 -D analyzer-optimize
+-dce full
 -main Main
 --debug
 --js bin/main.js
 -lib heaps
 -lib hxmath
 -lib random
+-D js-es=6
 
