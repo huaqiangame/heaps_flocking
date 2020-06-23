@@ -107,7 +107,7 @@ class Fish {
 			g2.rotation = velocity.angle;
 			calcAcc(dt);
 		} else {
-			trace('fuck');
+			// trace('fuck');
 		}
 		// if(location-location)
 	}
@@ -123,7 +123,7 @@ class Fish {
 	public function tween(p:Vector2) {
 		var force = p - location2;
 
-		if (force.length > 60 || Date.now().getTime() - lastTime > 1000||force.length<=2) {
+		if (force.length > 45 || Date.now().getTime() - lastTime > 1000 || force.length <= 2) {
 			location2 = p;
 			lastLocation = p;
 			lastTime = Date.now().getTime();
@@ -132,25 +132,24 @@ class Fish {
 			return;
 		}
 
+		var speed:Float = 0;
+		if (targetPos != null) {
+			var now = Date.now().getTime();
+			var diff = p - targetPos;
+			var diffLen = diff.length;
+			var diffTime = now - lastTime;
 
-        if(targetPos!=null){
-
-            var now=Date.now().getTime();
-            var diff=p-targetPos;
-            var  diffLen=diff.length;
-            var diffTime=now-lastTime;
-
-            trace(diffLen/diffTime);
-        }
+			// trace(diffLen/diffTime);
+			speed = diffLen / diffTime;
+		}
 		targetPos = p;
 
 		acceleration = force.normal / 3;
 
 		// trace(Date.now().getTime()-lastTime,force.length);
 
-        
-        
 		velocity = force.normalizeTo(1.5);
+		// trace(velocity.length,speed,acceleration.length);
 
 		lastTime = Date.now().getTime();
 	}

@@ -563,8 +563,6 @@ class fish_Fish {
 			_this2.posChanged = true;
 			_this2.rotation = v;
 			this.calcAcc(dt);
-		} else {
-			haxe_Log.trace("fuck",{ fileName : "src/fish/Fish.hx", lineNumber : 110, className : "fish.Fish", methodName : "update2"});
 		}
 	}
 	tween(p) {
@@ -573,7 +571,7 @@ class fish_Fish {
 		let self = this1;
 		self.x -= b.x;
 		self.y -= b.y;
-		if(Math.sqrt(self.x * self.x + self.y * self.y) > 60 || new Date().getTime() - this.lastTime > 1000 || Math.sqrt(self.x * self.x + self.y * self.y) <= 2) {
+		if(Math.sqrt(self.x * self.x + self.y * self.y) > 45 || new Date().getTime() - this.lastTime > 1000 || Math.sqrt(self.x * self.x + self.y * self.y) <= 2) {
 			this.location2 = p;
 			this.lastLocation = p;
 			this.lastTime = new Date().getTime();
@@ -588,6 +586,7 @@ class fish_Fish {
 			this.velocity = self1;
 			return;
 		}
+		let speed = 0;
 		if(this.targetPos != null) {
 			let now = new Date().getTime();
 			let b = this.targetPos;
@@ -597,7 +596,7 @@ class fish_Fish {
 			self.y -= b.y;
 			let diffLen = Math.sqrt(self.x * self.x + self.y * self.y);
 			let diffTime = now - this.lastTime;
-			haxe_Log.trace(diffLen / diffTime,{ fileName : "src/fish/Fish.hx", lineNumber : 143, className : "fish.Fish", methodName : "tween"});
+			speed = diffLen / diffTime;
 		}
 		this.targetPos = p;
 		let this2 = new hxmath_math_Vector2Default(self.x,self.y);
@@ -620,6 +619,9 @@ class fish_Fish {
 		self.x *= 1.5;
 		self.y *= 1.5;
 		this.velocity = self;
+		let self3 = this.velocity;
+		let self4 = this.acceleration;
+		haxe_Log.trace(Math.sqrt(self3.x * self3.x + self3.y * self3.y),{ fileName : "src/fish/Fish.hx", lineNumber : 155, className : "fish.Fish", methodName : "tween", customParams : [speed,Math.sqrt(self4.x * self4.x + self4.y * self4.y)]});
 		this.lastTime = new Date().getTime();
 	}
 	calcAcc(dt) {
