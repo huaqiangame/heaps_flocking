@@ -7,5 +7,6 @@
 -lib heaps
 -lib hxmath
 -lib random
+-lib actuate
 -D js-es=6
 

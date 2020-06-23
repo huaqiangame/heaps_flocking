@@ -26,6 +26,10 @@ class Flock {
 	public function new(x:Float, y:Float, width:Int, height:Int,r:Float) {
 		acceleration = Vector2.zero;
 		velocity = new Vector2(Random.int(-1, 1), Random.int(-1, 1));
+
+		while (velocity.isZero()){
+			velocity = new Vector2(Random.int(-1, 1), Random.int(-1, 1));
+		}
 		position = new Vector2(x, y);
 		this.r = r;
 		maxSpeed = 3;
