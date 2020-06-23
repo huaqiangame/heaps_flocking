@@ -1,5 +1,6 @@
 package fish;
 
+import h2d.Text;
 import haxe.Timer;
 import h2d.Scene;
 import h2d.Object;
@@ -40,7 +41,7 @@ class Fish {
 		var pointc:Vector2 = new Vector2(0, 2 * r);
 		g = new h2d.Graphics(parent);
 
-		g.beginFill(color, 0.2);
+		g.beginFill(color, 0.1);
 		// g.lineStyle(1, 0xFF00FF);
 		//	g.drawCircle(0, 0, r);
 
@@ -66,7 +67,9 @@ class Fish {
 		graphics.lineTo(pointa.x, pointa.y);
 		g2.endFill();
 		this.location2 = this.location = location;
-		flock = new Flock(location.x, location.y, s2d.width, s2d.height, r);
+        flock = new Flock(location.x, location.y, s2d.width, s2d.height, r);
+        
+       
 	}
 
 	var temp:Float = 0;
@@ -81,7 +84,7 @@ class Fish {
 		}
 		temp += dt;
 
-		if (temp >= 0.2) { // 这里模拟了服务器发送数据。
+		if (temp >= Random.float(0.2, 0.5)) { // 这里模拟了服务器发送数据。
 			tween(location);
 			temp = 0;
 		}
@@ -94,22 +97,30 @@ class Fish {
 	 * @param dt
 	 */
 	public function update2(dt:Float) {
-		if (velocity * acceleration > 0) { // 加速度和前进向量一定要同方向。
-			velocity += acceleration;
+        return;
+		if (velocity * acceleration > 0 && g2.rotation * -1 != velocity.angle) { // 加速度和前进向量一定要同方向。
 
-			location2 += velocity;
+			if (velocity * acceleration == 0.5) {
+				location2 = targetPos;
+			} else {
+				//trace("dir=" + velocity * acceleration);
+				velocity += acceleration;
 
+				location2 += velocity;
+			}
 			lastLocation = location;
 
 			g2.x = location2.x;
 			g2.y = location2.y;
 
+			// trace('velocity.angle=${velocity.angle}');
 			g2.rotation = velocity.angle;
+
 			calcAcc(dt);
 		} else {
-            // trace('fuck');
-            acceleration=Vector2.zero;
-           // velocity=Vector2.zero;
+			// trace('fuck');
+			acceleration = Vector2.zero;
+			// velocity=Vector2.zero;
 		}
 		// if(location-location)
 	}
@@ -125,7 +136,7 @@ class Fish {
 	public function tween(p:Vector2) {
 		var force = p - location2;
 
-		if (force.length > 45 || Date.now().getTime() - lastTime > 1000 || force.length <= 2) {
+		if (force.length > 60 || Date.now().getTime() - lastTime > 1000 || force.length <= 2) {
 			location2 = p;
 			lastLocation = p;
 			lastTime = Date.now().getTime();
@@ -142,11 +153,18 @@ class Fish {
 			var diffTime = now - lastTime;
 
 			// trace(diffLen/diffTime);
-			speed = diffLen / diffTime;
+            speed = diffLen / diffTime;
+            trace(speed);
 		}
 		targetPos = p;
 
-		acceleration = force.normal / 3;
+      
+        if(speed>=0.08){
+            acceleration = force.normal / 3;
+        }else{
+            acceleration = force.normal / 10000;
+        }
+		
 
 		// trace(Date.now().getTime()-lastTime,force.length);
 

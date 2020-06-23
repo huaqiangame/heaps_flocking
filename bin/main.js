@@ -183,12 +183,16 @@ class Main extends hxd_App {
 		let w = this.s2d.width + 30;
 		let h = this.s2d.height + 30;
 		help_Grid.drawGrid(Std.int(w / 30),Std.int(h / 30),30,30,g);
-		let fish = this.s2d;
-		let fish1 = this.s2d;
-		let this1 = new hxmath_math_Vector2Default(Random.int(31,this.s2d.width - 35),Random.int(31,35));
-		let fish2 = new fish_Fish(fish,fish1,this1,30);
-		this.arr2.push(fish2);
-		this.flocks.push(fish2.flock);
+		let _g = 0;
+		while(_g < 100) {
+			++_g;
+			let fish = this.s2d;
+			let fish1 = this.s2d;
+			let this1 = new hxmath_math_Vector2Default(Random.int(31,this.s2d.width - 35),Random.int(31,35));
+			let fish2 = new fish_Fish(fish,fish1,this1,30);
+			this.arr2.push(fish2);
+			this.flocks.push(fish2.flock);
+		}
 	}
 	update(dt) {
 		let _g = 0;
@@ -226,6 +230,9 @@ Math.__name__ = "Math";
 class Random {
 	static int(from,to) {
 		return from + Math.floor((to - from + 1) * Math.random());
+	}
+	static float(from,to) {
+		return from + (to - from) * Math.random();
 	}
 }
 Random.__name__ = "Random";
@@ -529,7 +536,7 @@ class fish_Fish {
 		let this14 = new hxmath_math_Vector2Default(0,2 * r);
 		let pointc = this14;
 		this.g = new h2d_Graphics(parent);
-		this.g.beginFill(color,0.2);
+		this.g.beginFill(color,0.1);
 		let graphics = this.g;
 		graphics.moveTo(pointa.x,pointa.y);
 		graphics.lineTo(pointb.x,pointb.y);
@@ -555,36 +562,48 @@ class fish_Fish {
 			let self = this.flock.velocity;
 			this.g.set_rotation(Math.atan2(self.y,self.x));
 		}
-		this.temp += dt;
-		if(this.temp >= 0.2) {
+		if((this.temp += dt) >= Random.float(0.2,0.5)) {
 			this.tween(this.location);
 			this.temp = 0;
 		}
 		this.update2(dt);
 	}
 	update2(dt) {
+		let tmp;
 		let a = this.velocity;
 		let b = this.acceleration;
 		if(a.x * b.x + a.y * b.y > 0) {
+			let self = this.velocity;
+			tmp = this.g2.rotation * -1 != Math.atan2(self.y,self.x);
+		} else {
+			tmp = false;
+		}
+		if(tmp) {
 			let a = this.velocity;
 			let b = this.acceleration;
-			let this1 = new hxmath_math_Vector2Default(a.x,a.y);
-			let self = this1;
-			self.x += b.x;
-			self.y += b.y;
-			this.velocity = self;
-			let a1 = this.location2;
-			let b1 = this.velocity;
-			let this11 = new hxmath_math_Vector2Default(a1.x,a1.y);
-			let self1 = this11;
-			self1.x += b1.x;
-			self1.y += b1.y;
-			this.location2 = self1;
+			if(a.x * b.x + a.y * b.y == 0.5) {
+				this.location2 = this.targetPos;
+			} else {
+				let a = this.velocity;
+				let b = this.acceleration;
+				let this1 = new hxmath_math_Vector2Default(a.x,a.y);
+				let self = this1;
+				self.x += b.x;
+				self.y += b.y;
+				this.velocity = self;
+				let a1 = this.location2;
+				let b1 = this.velocity;
+				let this11 = new hxmath_math_Vector2Default(a1.x,a1.y);
+				let self1 = this11;
+				self1.x += b1.x;
+				self1.y += b1.y;
+				this.location2 = self1;
+			}
 			this.lastLocation = this.location;
 			this.g2.set_x(this.location2.x);
 			this.g2.set_y(this.location2.y);
-			let self2 = this.velocity;
-			this.g2.set_rotation(Math.atan2(self2.y,self2.x));
+			let self = this.velocity;
+			this.g2.set_rotation(Math.atan2(self.y,self.x));
 			this.calcAcc(dt);
 		} else {
 			let this1 = new hxmath_math_Vector2Default(0.0,0.0);
@@ -597,7 +616,7 @@ class fish_Fish {
 		let self = this1;
 		self.x -= b.x;
 		self.y -= b.y;
-		if(Math.sqrt(self.x * self.x + self.y * self.y) > 45 || new Date().getTime() - this.lastTime > 1000 || Math.sqrt(self.x * self.x + self.y * self.y) <= 2) {
+		if(Math.sqrt(self.x * self.x + self.y * self.y) > 60 || new Date().getTime() - this.lastTime > 1000 || Math.sqrt(self.x * self.x + self.y * self.y) <= 2) {
 			this.location2 = p;
 			this.lastLocation = p;
 			this.lastTime = new Date().getTime();
@@ -612,30 +631,51 @@ class fish_Fish {
 			this.velocity = self1;
 			return;
 		}
+		let speed = 0;
 		if(this.targetPos != null) {
+			let now = new Date().getTime();
 			let b = this.targetPos;
 			let this1 = new hxmath_math_Vector2Default(p.x,p.y);
 			let self = this1;
 			self.x -= b.x;
 			self.y -= b.y;
+			let diffLen = Math.sqrt(self.x * self.x + self.y * self.y);
+			let diffTime = now - this.lastTime;
+			speed = diffLen / diffTime;
+			haxe_Log.trace(speed,{ fileName : "src/fish/Fish.hx", lineNumber : 156, className : "fish.Fish", methodName : "tween"});
 		}
 		this.targetPos = p;
-		let this2 = new hxmath_math_Vector2Default(self.x,self.y);
-		let self1 = this2;
-		let length = Math.sqrt(self1.x * self1.x + self1.y * self1.y);
-		if(length > 0.0) {
-			self1.x /= length;
-			self1.y /= length;
+		if(speed >= 0.08) {
+			let this2 = new hxmath_math_Vector2Default(self.x,self.y);
+			let self1 = this2;
+			let length = Math.sqrt(self1.x * self1.x + self1.y * self1.y);
+			if(length > 0.0) {
+				self1.x /= length;
+				self1.y /= length;
+			}
+			let this1 = new hxmath_math_Vector2Default(self1.x,self1.y);
+			let self2 = this1;
+			self2.x /= 3;
+			self2.y /= 3;
+			this.acceleration = self2;
+		} else {
+			let this2 = new hxmath_math_Vector2Default(self.x,self.y);
+			let self1 = this2;
+			let length = Math.sqrt(self1.x * self1.x + self1.y * self1.y);
+			if(length > 0.0) {
+				self1.x /= length;
+				self1.y /= length;
+			}
+			let this1 = new hxmath_math_Vector2Default(self1.x,self1.y);
+			let self2 = this1;
+			self2.x /= 10000;
+			self2.y /= 10000;
+			this.acceleration = self2;
 		}
-		let this11 = new hxmath_math_Vector2Default(self1.x,self1.y);
-		let self2 = this11;
-		self2.x /= 3;
-		self2.y /= 3;
-		this.acceleration = self2;
-		let length1 = Math.sqrt(self.x * self.x + self.y * self.y);
-		if(length1 > 0.0) {
-			self.x /= length1;
-			self.y /= length1;
+		let length = Math.sqrt(self.x * self.x + self.y * self.y);
+		if(length > 0.0) {
+			self.x /= length;
+			self.y /= length;
 		}
 		self.x *= 1.5;
 		self.y *= 1.5;
