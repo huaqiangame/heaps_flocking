@@ -9,4 +9,5 @@
 -lib random
 -lib actuate
 -D js-es=6
+-D no_inline
 

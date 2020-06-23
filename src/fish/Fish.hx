@@ -107,7 +107,9 @@ class Fish {
 			g2.rotation = velocity.angle;
 			calcAcc(dt);
 		} else {
-			// trace('fuck');
+            // trace('fuck');
+            acceleration=Vector2.zero;
+           // velocity=Vector2.zero;
 		}
 		// if(location-location)
 	}

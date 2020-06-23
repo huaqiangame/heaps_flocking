@@ -29,7 +29,7 @@ class HxOverrides {
 	static cca(s,index) {
 		let x = s.charCodeAt(index);
 		if(x != x) {
-			return undefined;
+			return js_Lib.get_undefined();
 		}
 		return x;
 	}
@@ -70,6 +70,10 @@ class Lambda {
 	}
 }
 Lambda.__name__ = "Lambda";
+class h3d_IDrawable {
+}
+h3d_IDrawable.__name__ = "h3d.IDrawable";
+h3d_IDrawable.__isInterface__ = true;
 class hxd_App {
 	constructor() {
 		if(hxd_App._hx_skip_constructor) {
@@ -78,7 +82,7 @@ class hxd_App {
 		this._hx_constructor();
 	}
 	_hx_constructor() {
-		let engine = h3d_Engine.CURRENT;
+		let engine = h3d_Engine.getCurrent();
 		let _gthis = this;
 		if(engine != null) {
 			this.engine = engine;
@@ -156,6 +160,7 @@ class hxd_App {
 	}
 }
 hxd_App.__name__ = "hxd.App";
+hxd_App.__interfaces__ = [h3d_IDrawable];
 Object.assign(hxd_App.prototype, {
 	__class__: hxd_App
 });
@@ -177,17 +182,13 @@ class Main extends hxd_App {
 		let g = new h2d_Graphics(this.s2d);
 		let w = this.s2d.width + 30;
 		let h = this.s2d.height + 30;
-		help_Grid.drawGrid(w / 30 | 0,h / 30 | 0,30,30,g);
-		let _g = 0;
-		while(_g < 100) {
-			++_g;
-			let fish = this.s2d;
-			let fish1 = this.s2d;
-			let this1 = new hxmath_math_Vector2Default(31 + Math.floor((this.s2d.width - 35 - 31 + 1) * Math.random()),31 + Math.floor(5 * Math.random()));
-			let fish2 = new fish_Fish(fish,fish1,this1,30);
-			this.arr2.push(fish2);
-			this.flocks.push(fish2.flock);
-		}
+		help_Grid.drawGrid(Std.int(w / 30),Std.int(h / 30),30,30,g);
+		let fish = this.s2d;
+		let fish1 = this.s2d;
+		let this1 = new hxmath_math_Vector2Default(Random.int(31,this.s2d.width - 35),Random.int(31,35));
+		let fish2 = new fish_Fish(fish,fish1,this1,30);
+		this.arr2.push(fish2);
+		this.flocks.push(fish2.flock);
 	}
 	update(dt) {
 		let _g = 0;
@@ -222,6 +223,12 @@ Object.assign(Main.prototype, {
 	__class__: Main
 });
 Math.__name__ = "Math";
+class Random {
+	static int(from,to) {
+		return from + Math.floor((to - from + 1) * Math.random());
+	}
+}
+Random.__name__ = "Random";
 class Reflect {
 	static field(o,field) {
 		try {
@@ -230,9 +237,15 @@ class Reflect {
 			return null;
 		}
 	}
+	static setField(o,field,value) {
+		o[field] = value;
+	}
+	static callMethod(o,func,args) {
+		return func.apply(o,args);
+	}
 	static isFunction(f) {
 		if(typeof(f) == "function") {
-			return !(f.__name__ || f.__ename__);
+			return !(js_Boot.isClass(f) || js_Boot.isEnum(f));
 		} else {
 			return false;
 		}
@@ -269,8 +282,21 @@ class Reflect {
 }
 Reflect.__name__ = "Reflect";
 class Std {
+	static isOfType(v,t) {
+		return js_Boot.__instanceof(v,t);
+	}
+	static downcast(value,c) {
+		if(js_Boot.__downcastCheck(value,c)) {
+			return value;
+		} else {
+			return null;
+		}
+	}
 	static string(s) {
 		return js_Boot.__string_rec(s,"");
+	}
+	static int(x) {
+		return x | 0;
 	}
 	static parseInt(x) {
 		if(x != null) {
@@ -278,9 +304,9 @@ class Std {
 			let _g1 = x.length;
 			while(_g < _g1) {
 				let i = _g++;
-				let c = x.charCodeAt(i);
+				let c = StringTools.fastCodeAt(x,i);
 				if(c <= 8 || c >= 14 && c != 32 && c != 45) {
-					let nc = x.charCodeAt(i + 1);
+					let nc = StringTools.fastCodeAt(x,i + 1);
 					let v = parseInt(x,nc == 120 || nc == 88 ? 16 : 10);
 					if(isNaN(v)) {
 						return null;
@@ -292,11 +318,20 @@ class Std {
 		}
 		return null;
 	}
+	static parseFloat(x) {
+		return parseFloat(x);
+	}
 }
 Std.__name__ = "Std";
 class StringBuf {
 	constructor() {
 		this.b = "";
+	}
+	add(x) {
+		this.b += Std.string(x);
+	}
+	toString() {
+		return this.b;
 	}
 }
 StringBuf.__name__ = "StringBuf";
@@ -342,9 +377,24 @@ class StringTools {
 	static trim(s) {
 		return StringTools.ltrim(StringTools.rtrim(s));
 	}
+	static fastCodeAt(s,index) {
+		return s.charCodeAt(index);
+	}
 }
 StringTools.__name__ = "StringTools";
 class Type {
+	static getClass(o) {
+		return js_Boot.getClass(o);
+	}
+	static getSuperClass(c) {
+		return c.__super__;
+	}
+	static getClassName(c) {
+		return c.__name__;
+	}
+	static createEmptyInstance(cl) {
+		return Object.create(cl.prototype);
+	}
 	static createEnum(e,constr,params) {
 		let f = Reflect.field(e,constr);
 		if(f == null) {
@@ -354,7 +404,7 @@ class Type {
 			if(params == null) {
 				throw haxe_Exception.thrown("Constructor " + constr + " need parameters");
 			}
-			return f.apply(e,params);
+			return Reflect.callMethod(e,f,params);
 		}
 		if(params != null && params.length != 0) {
 			throw haxe_Exception.thrown("Constructor " + constr + " does not need parameters");
@@ -396,6 +446,9 @@ class Type {
 		}
 		return true;
 	}
+	static enumConstructor(e) {
+		return $hxEnums[e.__enum__].__constructs__[e._hx_index];
+	}
 	static enumParameters(e) {
 		let enm = $hxEnums[e.__enum__];
 		let ctorName = enm.__constructs__[e._hx_index];
@@ -413,13 +466,19 @@ class Type {
 			return [];
 		}
 	}
+	static enumIndex(e) {
+		return e._hx_index;
+	}
+	static allEnums(e) {
+		return e.__empty_constructs__.slice();
+	}
 }
 Type.__name__ = "Type";
 class fish_Ball {
 	constructor(parent,s2d,location,velocity) {
 		this.s2d = s2d;
 		this.g = new h2d_Graphics(parent);
-		this.g.beginFill(16777215 * Math.random() | 0,0.3);
+		this.g.beginFill(Std.int(16777215 * Math.random()),0.3);
 		this.g.lineStyle(1,16711935);
 		this.g.drawCircle(0,0,30);
 		this.g.endFill();
@@ -440,12 +499,8 @@ class fish_Ball {
 		if(this.location.y > this.s2d.height - 30 || this.location.y < 30) {
 			this.velocity.y *= -1;
 		}
-		let _this = this.g;
-		_this.posChanged = true;
-		_this.x = this.location.x;
-		let _this1 = this.g;
-		_this1.posChanged = true;
-		_this1.y = this.location.y;
+		this.g.set_x(this.location.x);
+		this.g.set_y(this.location.y);
 	}
 }
 fish_Ball.__name__ = "fish.Ball";
@@ -466,7 +521,7 @@ class fish_Fish {
 		this.acceleration = this11;
 		let this111 = new hxmath_math_Vector2Default(0.0,0.0);
 		this.velocity = this111;
-		let color = 16777215 * Math.random() | 0;
+		let color = Std.int(16777215 * Math.random());
 		let this12 = new hxmath_math_Vector2Default(0,0);
 		let pointa = this12;
 		let this13 = new hxmath_math_Vector2Default(r / 2,r);
@@ -476,36 +531,18 @@ class fish_Fish {
 		this.g = new h2d_Graphics(parent);
 		this.g.beginFill(color,0.2);
 		let graphics = this.g;
-		let x = pointa.x;
-		let y = pointa.y;
-		graphics.flush();
-		graphics.addVertex(x,y,graphics.curR,graphics.curG,graphics.curB,graphics.curA,x * graphics.ma + y * graphics.mc + graphics.mx,x * graphics.mb + y * graphics.md + graphics.my);
-		let x1 = pointb.x;
-		let y1 = pointb.y;
-		graphics.addVertex(x1,y1,graphics.curR,graphics.curG,graphics.curB,graphics.curA,x1 * graphics.ma + y1 * graphics.mc + graphics.mx,x1 * graphics.mb + y1 * graphics.md + graphics.my);
-		let x2 = pointc.x;
-		let y2 = pointc.y;
-		graphics.addVertex(x2,y2,graphics.curR,graphics.curG,graphics.curB,graphics.curA,x2 * graphics.ma + y2 * graphics.mc + graphics.mx,x2 * graphics.mb + y2 * graphics.md + graphics.my);
-		let x3 = pointa.x;
-		let y3 = pointa.y;
-		graphics.addVertex(x3,y3,graphics.curR,graphics.curG,graphics.curB,graphics.curA,x3 * graphics.ma + y3 * graphics.mc + graphics.mx,x3 * graphics.mb + y3 * graphics.md + graphics.my);
+		graphics.moveTo(pointa.x,pointa.y);
+		graphics.lineTo(pointb.x,pointb.y);
+		graphics.lineTo(pointc.x,pointc.y);
+		graphics.lineTo(pointa.x,pointa.y);
 		this.g.endFill();
 		this.g2 = new h2d_Graphics(parent);
 		this.g2.beginFill(color,0.5);
 		graphics = this.g2;
-		let x4 = pointa.x;
-		let y4 = pointa.y;
-		graphics.flush();
-		graphics.addVertex(x4,y4,graphics.curR,graphics.curG,graphics.curB,graphics.curA,x4 * graphics.ma + y4 * graphics.mc + graphics.mx,x4 * graphics.mb + y4 * graphics.md + graphics.my);
-		let x5 = pointb.x;
-		let y5 = pointb.y;
-		graphics.addVertex(x5,y5,graphics.curR,graphics.curG,graphics.curB,graphics.curA,x5 * graphics.ma + y5 * graphics.mc + graphics.mx,x5 * graphics.mb + y5 * graphics.md + graphics.my);
-		let x6 = pointc.x;
-		let y6 = pointc.y;
-		graphics.addVertex(x6,y6,graphics.curR,graphics.curG,graphics.curB,graphics.curA,x6 * graphics.ma + y6 * graphics.mc + graphics.mx,x6 * graphics.mb + y6 * graphics.md + graphics.my);
-		let x7 = pointa.x;
-		let y7 = pointa.y;
-		graphics.addVertex(x7,y7,graphics.curR,graphics.curG,graphics.curB,graphics.curA,x7 * graphics.ma + y7 * graphics.mc + graphics.mx,x7 * graphics.mb + y7 * graphics.md + graphics.my);
+		graphics.moveTo(pointa.x,pointa.y);
+		graphics.lineTo(pointb.x,pointb.y);
+		graphics.lineTo(pointc.x,pointc.y);
+		graphics.lineTo(pointa.x,pointa.y);
 		this.g2.endFill();
 		this.location2 = this.location = location;
 		this.flock = new fish_Flock(location.x,location.y,s2d.width,s2d.height,r);
@@ -513,17 +550,10 @@ class fish_Fish {
 	update(dt) {
 		if(this.flock != null) {
 			this.location = this.flock.position;
-			let _this = this.g;
-			_this.posChanged = true;
-			_this.x = this.location.x;
-			let _this1 = this.g;
-			_this1.posChanged = true;
-			_this1.y = this.location.y;
-			let _this2 = this.g;
+			this.g.set_x(this.location.x);
+			this.g.set_y(this.location.y);
 			let self = this.flock.velocity;
-			let v = Math.atan2(self.y,self.x);
-			_this2.posChanged = true;
-			_this2.rotation = v;
+			this.g.set_rotation(Math.atan2(self.y,self.x));
 		}
 		this.temp += dt;
 		if(this.temp >= 0.2) {
@@ -551,18 +581,14 @@ class fish_Fish {
 			self1.y += b1.y;
 			this.location2 = self1;
 			this.lastLocation = this.location;
-			let _this = this.g2;
-			_this.posChanged = true;
-			_this.x = this.location2.x;
-			let _this1 = this.g2;
-			_this1.posChanged = true;
-			_this1.y = this.location2.y;
-			let _this2 = this.g2;
+			this.g2.set_x(this.location2.x);
+			this.g2.set_y(this.location2.y);
 			let self2 = this.velocity;
-			let v = Math.atan2(self2.y,self2.x);
-			_this2.posChanged = true;
-			_this2.rotation = v;
+			this.g2.set_rotation(Math.atan2(self2.y,self2.x));
 			this.calcAcc(dt);
+		} else {
+			let this1 = new hxmath_math_Vector2Default(0.0,0.0);
+			this.acceleration = this1;
 		}
 	}
 	tween(p) {
@@ -586,17 +612,12 @@ class fish_Fish {
 			this.velocity = self1;
 			return;
 		}
-		let speed = 0;
 		if(this.targetPos != null) {
-			let now = new Date().getTime();
 			let b = this.targetPos;
 			let this1 = new hxmath_math_Vector2Default(p.x,p.y);
 			let self = this1;
 			self.x -= b.x;
 			self.y -= b.y;
-			let diffLen = Math.sqrt(self.x * self.x + self.y * self.y);
-			let diffTime = now - this.lastTime;
-			speed = diffLen / diffTime;
 		}
 		this.targetPos = p;
 		let this2 = new hxmath_math_Vector2Default(self.x,self.y);
@@ -619,9 +640,6 @@ class fish_Fish {
 		self.x *= 1.5;
 		self.y *= 1.5;
 		this.velocity = self;
-		let self3 = this.velocity;
-		let self4 = this.acceleration;
-		haxe_Log.trace(Math.sqrt(self3.x * self3.x + self3.y * self3.y),{ fileName : "src/fish/Fish.hx", lineNumber : 155, className : "fish.Fish", methodName : "tween", customParams : [speed,Math.sqrt(self4.x * self4.x + self4.y * self4.y)]});
 		this.lastTime = new Date().getTime();
 	}
 	calcAcc(dt) {
@@ -648,10 +666,10 @@ class fish_Flock {
 		this.extraSeparation = 2;
 		let this1 = new hxmath_math_Vector2Default(0.0,0.0);
 		this.acceleration = this1;
-		let this2 = new hxmath_math_Vector2Default(-1 + Math.floor(3 * Math.random()),-1 + Math.floor(3 * Math.random()));
+		let this2 = new hxmath_math_Vector2Default(Random.int(-1,1),Random.int(-1,1));
 		this.velocity = this2;
 		while(fish_Vector2Helper.isZero(this.velocity)) {
-			let this1 = new hxmath_math_Vector2Default(-1 + Math.floor(3 * Math.random()),-1 + Math.floor(3 * Math.random()));
+			let this1 = new hxmath_math_Vector2Default(Random.int(-1,1),Random.int(-1,1));
 			this.velocity = this1;
 		}
 		let this3 = new hxmath_math_Vector2Default(x,y);
@@ -980,16 +998,11 @@ class h2d_Object {
 		this.matD = 1;
 		this.absX = 0;
 		this.absY = 0;
-		this.posChanged = true;
-		this.x = 0;
-		this.posChanged = true;
-		this.y = 0;
-		this.posChanged = true;
-		this.scaleX = 1;
-		this.posChanged = true;
-		this.scaleY = 1;
-		this.posChanged = true;
-		this.rotation = 0;
+		this.set_x(0);
+		this.set_y(0);
+		this.set_scaleX(1);
+		this.set_scaleY(1);
+		this.set_rotation(0);
 		this.blendMode = h2d_BlendMode.Alpha;
 		this.posChanged = parent != null;
 		this.set_visible(true);
@@ -1002,10 +1015,7 @@ class h2d_Object {
 		if(out == null) {
 			out = new h2d_col_Bounds();
 		} else {
-			out.xMin = 1e20;
-			out.yMin = 1e20;
-			out.xMax = -1e20;
-			out.yMax = -1e20;
+			out.empty();
 		}
 		if(relativeTo != null) {
 			relativeTo.syncPos();
@@ -1014,7 +1024,7 @@ class h2d_Object {
 			this.syncPos();
 		}
 		this.getBoundsRec(relativeTo,out,false);
-		if(out.xMax <= out.xMin || out.yMax <= out.yMin) {
+		if(out.isEmpty()) {
 			this.addBounds(relativeTo,out,-1,-1,2,2);
 			out.xMax = out.xMin = (out.xMax + out.xMin) * 0.5;
 			out.yMax = out.yMin = (out.yMax + out.yMin) * 0.5;
@@ -1035,10 +1045,7 @@ class h2d_Object {
 		}
 		let n = this.children.length;
 		if(n == 0) {
-			out.xMin = 1e20;
-			out.yMin = 1e20;
-			out.xMax = -1e20;
-			out.yMax = -1e20;
+			out.empty();
 			return;
 		}
 		if(n == 1) {
@@ -1046,17 +1053,14 @@ class h2d_Object {
 			if(c.visible) {
 				c.getBoundsRec(relativeTo,out,forSize);
 			} else {
-				out.xMin = 1e20;
-				out.yMin = 1e20;
-				out.xMax = -1e20;
-				out.yMax = -1e20;
+				out.empty();
 			}
 			return;
 		}
-		let xmin = Infinity;
-		let ymin = Infinity;
-		let xmax = -Infinity;
-		let ymax = -Infinity;
+		let xmin = hxd_Math.get_POSITIVE_INFINITY();
+		let ymin = hxd_Math.get_POSITIVE_INFINITY();
+		let xmax = hxd_Math.get_NEGATIVE_INFINITY();
+		let ymax = hxd_Math.get_NEGATIVE_INFINITY();
 		let _g = 0;
 		let _g1 = this.children;
 		while(_g < _g1.length) {
@@ -1089,62 +1093,10 @@ class h2d_Object {
 			return;
 		}
 		if(relativeTo == null) {
-			let x = dx * this.matA + dy * this.matC + this.absX;
-			let y = dx * this.matB + dy * this.matD + this.absY;
-			if(x < out.xMin) {
-				out.xMin = x;
-			}
-			if(x > out.xMax) {
-				out.xMax = x;
-			}
-			if(y < out.yMin) {
-				out.yMin = y;
-			}
-			if(y > out.yMax) {
-				out.yMax = y;
-			}
-			let x1 = (dx + width) * this.matA + dy * this.matC + this.absX;
-			let y1 = (dx + width) * this.matB + dy * this.matD + this.absY;
-			if(x1 < out.xMin) {
-				out.xMin = x1;
-			}
-			if(x1 > out.xMax) {
-				out.xMax = x1;
-			}
-			if(y1 < out.yMin) {
-				out.yMin = y1;
-			}
-			if(y1 > out.yMax) {
-				out.yMax = y1;
-			}
-			let x2 = dx * this.matA + (dy + height) * this.matC + this.absX;
-			let y2 = dx * this.matB + (dy + height) * this.matD + this.absY;
-			if(x2 < out.xMin) {
-				out.xMin = x2;
-			}
-			if(x2 > out.xMax) {
-				out.xMax = x2;
-			}
-			if(y2 < out.yMin) {
-				out.yMin = y2;
-			}
-			if(y2 > out.yMax) {
-				out.yMax = y2;
-			}
-			let x3 = (dx + width) * this.matA + (dy + height) * this.matC + this.absX;
-			let y3 = (dx + width) * this.matB + (dy + height) * this.matD + this.absY;
-			if(x3 < out.xMin) {
-				out.xMin = x3;
-			}
-			if(x3 > out.xMax) {
-				out.xMax = x3;
-			}
-			if(y3 < out.yMin) {
-				out.yMin = y3;
-			}
-			if(y3 > out.yMax) {
-				out.yMax = y3;
-			}
+			out.addPos(dx * this.matA + dy * this.matC + this.absX,dx * this.matB + dy * this.matD + this.absY);
+			out.addPos((dx + width) * this.matA + dy * this.matC + this.absX,(dx + width) * this.matB + dy * this.matD + this.absY);
+			out.addPos(dx * this.matA + (dy + height) * this.matC + this.absX,dx * this.matB + (dy + height) * this.matD + this.absY);
+			out.addPos((dx + width) * this.matA + (dy + height) * this.matC + this.absX,(dx + width) * this.matB + (dy + height) * this.matD + this.absY);
 			return;
 		}
 		if(relativeTo == this) {
@@ -1175,68 +1127,16 @@ class h2d_Object {
 		let rY = this.absY - relativeTo.absY;
 		let x = dx * this.matA + dy * this.matC + rX;
 		let y = dx * this.matB + dy * this.matD + rY;
-		let x1 = x * rA + y * rC;
-		let y1 = x * rB + y * rD;
-		if(x1 < out.xMin) {
-			out.xMin = x1;
-		}
-		if(x1 > out.xMax) {
-			out.xMax = x1;
-		}
-		if(y1 < out.yMin) {
-			out.yMin = y1;
-		}
-		if(y1 > out.yMax) {
-			out.yMax = y1;
-		}
+		out.addPos(x * rA + y * rC,x * rB + y * rD);
 		x = (dx + width) * this.matA + dy * this.matC + rX;
 		y = (dx + width) * this.matB + dy * this.matD + rY;
-		let x2 = x * rA + y * rC;
-		let y2 = x * rB + y * rD;
-		if(x2 < out.xMin) {
-			out.xMin = x2;
-		}
-		if(x2 > out.xMax) {
-			out.xMax = x2;
-		}
-		if(y2 < out.yMin) {
-			out.yMin = y2;
-		}
-		if(y2 > out.yMax) {
-			out.yMax = y2;
-		}
+		out.addPos(x * rA + y * rC,x * rB + y * rD);
 		x = dx * this.matA + (dy + height) * this.matC + rX;
 		y = dx * this.matB + (dy + height) * this.matD + rY;
-		let x3 = x * rA + y * rC;
-		let y3 = x * rB + y * rD;
-		if(x3 < out.xMin) {
-			out.xMin = x3;
-		}
-		if(x3 > out.xMax) {
-			out.xMax = x3;
-		}
-		if(y3 < out.yMin) {
-			out.yMin = y3;
-		}
-		if(y3 > out.yMax) {
-			out.yMax = y3;
-		}
+		out.addPos(x * rA + y * rC,x * rB + y * rD);
 		x = (dx + width) * this.matA + (dy + height) * this.matC + rX;
 		y = (dx + width) * this.matB + (dy + height) * this.matD + rY;
-		let x4 = x * rA + y * rC;
-		let y4 = x * rB + y * rD;
-		if(x4 < out.xMin) {
-			out.xMin = x4;
-		}
-		if(x4 > out.xMax) {
-			out.xMax = x4;
-		}
-		if(y4 < out.yMin) {
-			out.yMin = y4;
-		}
-		if(y4 > out.yMax) {
-			out.yMax = y4;
-		}
+		out.addPos(x * rA + y * rC,x * rB + y * rD);
 	}
 	localToGlobal(pt) {
 		this.syncPos();
@@ -1263,20 +1163,14 @@ class h2d_Object {
 	getScene() {
 		let p = this;
 		while(p.parent != null) p = p.parent;
-		if(((p) instanceof h2d_Scene)) {
-			return p;
-		} else {
-			return null;
-		}
+		return hxd_impl_Api.downcast(p,h2d_Scene);
 	}
 	set_visible(b) {
 		if(this.visible == b) {
 			return b;
 		}
 		this.visible = b;
-		if(this.parentContainer != null) {
-			this.parentContainer.contentChanged(this);
-		}
+		this.onContentChanged();
 		return b;
 	}
 	addChild(s) {
@@ -1316,6 +1210,9 @@ class h2d_Object {
 				s.onHierarchyMoved(true);
 			}
 		}
+		this.onContentChanged();
+	}
+	onContentChanged() {
 		if(this.parentContainer != null) {
 			this.parentContainer.contentChanged(this);
 		}
@@ -1365,9 +1262,7 @@ class h2d_Object {
 				s.setParentContainer(null);
 			}
 			s.posChanged = true;
-			if(this.parentContainer != null) {
-				this.parentContainer.contentChanged(this);
-			}
+			this.onContentChanged();
 		}
 	}
 	setParentContainer(c) {
@@ -1438,8 +1333,8 @@ class h2d_Object {
 				this.matC = 0;
 				this.matD = this.scaleY;
 			} else {
-				cr = Math.cos(this.rotation);
-				sr = Math.sin(this.rotation);
+				cr = hxd_Math.cos(this.rotation);
+				sr = hxd_Math.sin(this.rotation);
 				this.matA = this.scaleX * cr;
 				this.matB = this.scaleX * sr;
 				this.matC = this.scaleY * -sr;
@@ -1454,8 +1349,8 @@ class h2d_Object {
 				this.matC = this.scaleY * this.parent.matC;
 				this.matD = this.scaleY * this.parent.matD;
 			} else {
-				let cr = Math.cos(this.rotation);
-				let sr = Math.sin(this.rotation);
+				let cr = hxd_Math.cos(this.rotation);
+				let sr = hxd_Math.sin(this.rotation);
 				let tmpA = this.scaleX * cr;
 				let tmpB = this.scaleX * sr;
 				let tmpC = this.scaleY * -sr;
@@ -1473,13 +1368,77 @@ class h2d_Object {
 		if(h2d_Object.nullDrawable == null) {
 			h2d_Object.nullDrawable = new h2d_Drawable(null);
 		}
-		h2d_Object.nullDrawable.absX = this.absX;
-		h2d_Object.nullDrawable.absY = this.absY;
-		h2d_Object.nullDrawable.matA = this.matA;
-		h2d_Object.nullDrawable.matB = this.matB;
-		h2d_Object.nullDrawable.matC = this.matC;
-		h2d_Object.nullDrawable.matD = this.matD;
-		ctx.drawTile(h2d_Object.nullDrawable,tile);
+		if(!ctx.hasBuffering()) {
+			h2d_Object.nullDrawable.absX = this.absX;
+			h2d_Object.nullDrawable.absY = this.absY;
+			h2d_Object.nullDrawable.matA = this.matA;
+			h2d_Object.nullDrawable.matB = this.matB;
+			h2d_Object.nullDrawable.matC = this.matC;
+			h2d_Object.nullDrawable.matD = this.matD;
+			ctx.drawTile(h2d_Object.nullDrawable,tile);
+			return;
+		}
+		if(!ctx.beginDrawBatch(h2d_Object.nullDrawable,tile.getTexture())) {
+			return;
+		}
+		let ax = this.absX + tile.dx * this.matA + tile.dy * this.matC;
+		let ay = this.absY + tile.dx * this.matB + tile.dy * this.matD;
+		let buf = ctx.buffer;
+		let pos = ctx.bufPos;
+		let _g = buf.pos;
+		let _g1 = pos + 32;
+		while(_g < _g1) {
+			++_g;
+			if(buf.pos == buf.array.length) {
+				let newSize = buf.array.length << 1;
+				if(newSize < 128) {
+					newSize = 128;
+				}
+				let newArray = new Float32Array(newSize);
+				newArray.set(buf.array);
+				buf.array = newArray;
+			}
+			buf.array[buf.pos++] = 0.;
+		}
+		buf.array[pos++] = ax;
+		buf.array[pos++] = ay;
+		buf.array[pos++] = tile.u;
+		buf.array[pos++] = tile.v;
+		buf.array[pos++] = 1.;
+		buf.array[pos++] = 1.;
+		buf.array[pos++] = 1.;
+		buf.array[pos++] = ctx.globalAlpha;
+		let tw = tile.width;
+		let th = tile.height;
+		let dx1 = tw * this.matA;
+		let dy1 = tw * this.matB;
+		let dx2 = th * this.matC;
+		let dy2 = th * this.matD;
+		buf.array[pos++] = ax + dx1;
+		buf.array[pos++] = ay + dy1;
+		buf.array[pos++] = tile.u2;
+		buf.array[pos++] = tile.v;
+		buf.array[pos++] = 1.;
+		buf.array[pos++] = 1.;
+		buf.array[pos++] = 1.;
+		buf.array[pos++] = ctx.globalAlpha;
+		buf.array[pos++] = ax + dx2;
+		buf.array[pos++] = ay + dy2;
+		buf.array[pos++] = tile.u;
+		buf.array[pos++] = tile.v2;
+		buf.array[pos++] = 1.;
+		buf.array[pos++] = 1.;
+		buf.array[pos++] = 1.;
+		buf.array[pos++] = ctx.globalAlpha;
+		buf.array[pos++] = ax + dx1 + dx2;
+		buf.array[pos++] = ay + dy1 + dy2;
+		buf.array[pos++] = tile.u2;
+		buf.array[pos++] = tile.v2;
+		buf.array[pos++] = 1.;
+		buf.array[pos++] = 1.;
+		buf.array[pos++] = 1.;
+		buf.array[pos++] = ctx.globalAlpha;
+		ctx.bufPos = pos;
 	}
 	clipBounds(ctx,bounds) {
 		let view = ctx.tmpBounds;
@@ -1490,8 +1449,8 @@ class h2d_Object {
 		let absX;
 		let absY;
 		if(ctx.inFilter != null) {
-			let f1 = ctx.baseShader.filterMatrixA__;
-			let f2 = ctx.baseShader.filterMatrixB__;
+			let f1 = ctx.baseShader.get_filterMatrixA();
+			let f2 = ctx.baseShader.get_filterMatrixB();
 			matA = this.matA * f1.x + this.matB * f1.y;
 			matB = this.matA * f2.x + this.matB * f2.y;
 			matC = this.matC * f1.x + this.matD * f1.y;
@@ -1506,74 +1465,19 @@ class h2d_Object {
 			absX = this.absX;
 			absY = this.absY;
 		}
-		view.xMin = 1e20;
-		view.yMin = 1e20;
-		view.xMax = -1e20;
-		view.yMax = -1e20;
+		view.empty();
 		let x = bounds.xMin;
 		let y = bounds.yMin;
-		let x1 = x * matA + y * matC + absX;
-		let y1 = x * matB + y * matD + absY;
-		if(x1 < view.xMin) {
-			view.xMin = x1;
-		}
-		if(x1 > view.xMax) {
-			view.xMax = x1;
-		}
-		if(y1 < view.yMin) {
-			view.yMin = y1;
-		}
-		if(y1 > view.yMax) {
-			view.yMax = y1;
-		}
-		let x2 = bounds.xMax;
-		let y2 = bounds.yMin;
-		let x3 = x2 * matA + y2 * matC + absX;
-		let y3 = x2 * matB + y2 * matD + absY;
-		if(x3 < view.xMin) {
-			view.xMin = x3;
-		}
-		if(x3 > view.xMax) {
-			view.xMax = x3;
-		}
-		if(y3 < view.yMin) {
-			view.yMin = y3;
-		}
-		if(y3 > view.yMax) {
-			view.yMax = y3;
-		}
-		let x4 = bounds.xMin;
-		let y4 = bounds.yMax;
-		let x5 = x4 * matA + y4 * matC + absX;
-		let y5 = x4 * matB + y4 * matD + absY;
-		if(x5 < view.xMin) {
-			view.xMin = x5;
-		}
-		if(x5 > view.xMax) {
-			view.xMax = x5;
-		}
-		if(y5 < view.yMin) {
-			view.yMin = y5;
-		}
-		if(y5 > view.yMax) {
-			view.yMax = y5;
-		}
-		let x6 = bounds.xMax;
-		let y6 = bounds.yMax;
-		let x7 = x6 * matA + y6 * matC + absX;
-		let y7 = x6 * matB + y6 * matD + absY;
-		if(x7 < view.xMin) {
-			view.xMin = x7;
-		}
-		if(x7 > view.xMax) {
-			view.xMax = x7;
-		}
-		if(y7 < view.yMin) {
-			view.yMin = y7;
-		}
-		if(y7 > view.yMax) {
-			view.yMax = y7;
-		}
+		view.addPos(x * matA + y * matC + absX,x * matB + y * matD + absY);
+		let x1 = bounds.xMax;
+		let y1 = bounds.yMin;
+		view.addPos(x1 * matA + y1 * matC + absX,x1 * matB + y1 * matD + absY);
+		let x2 = bounds.xMin;
+		let y2 = bounds.yMax;
+		view.addPos(x2 * matA + y2 * matC + absX,x2 * matB + y2 * matD + absY);
+		let x3 = bounds.xMax;
+		let y3 = bounds.yMax;
+		view.addPos(x3 * matA + y3 * matC + absX,x3 * matB + y3 * matD + absY);
 		if(view.xMin < ctx.curX) {
 			view.xMin = ctx.curX;
 		}
@@ -1591,94 +1495,28 @@ class h2d_Object {
 		let syMin = view.yMin;
 		let sxMax = view.xMax;
 		let syMax = view.yMax;
-		view.xMin = 1e20;
-		view.yMin = 1e20;
-		view.xMax = -1e20;
-		view.yMax = -1e20;
-		let x8 = sxMin;
-		let y8 = syMin;
-		x8 = sxMin - absX;
-		y8 = syMin - absY;
-		let x9 = (x8 * matD - y8 * matC) * invDet;
-		let y9 = (-x8 * matB + y8 * matA) * invDet;
-		if(x9 < view.xMin) {
-			view.xMin = x9;
-		}
-		if(x9 > view.xMax) {
-			view.xMax = x9;
-		}
-		if(y9 < view.yMin) {
-			view.yMin = y9;
-		}
-		if(y9 > view.yMax) {
-			view.yMax = y9;
-		}
-		let x10 = sxMax;
-		let y10 = syMin;
-		x10 = sxMax - absX;
-		y10 = syMin - absY;
-		let x11 = (x10 * matD - y10 * matC) * invDet;
-		let y11 = (-x10 * matB + y10 * matA) * invDet;
-		if(x11 < view.xMin) {
-			view.xMin = x11;
-		}
-		if(x11 > view.xMax) {
-			view.xMax = x11;
-		}
-		if(y11 < view.yMin) {
-			view.yMin = y11;
-		}
-		if(y11 > view.yMax) {
-			view.yMax = y11;
-		}
-		let x12 = sxMin;
-		let y12 = syMax;
-		x12 = sxMin - absX;
-		y12 = syMax - absY;
-		let x13 = (x12 * matD - y12 * matC) * invDet;
-		let y13 = (-x12 * matB + y12 * matA) * invDet;
-		if(x13 < view.xMin) {
-			view.xMin = x13;
-		}
-		if(x13 > view.xMax) {
-			view.xMax = x13;
-		}
-		if(y13 < view.yMin) {
-			view.yMin = y13;
-		}
-		if(y13 > view.yMax) {
-			view.yMax = y13;
-		}
-		let x14 = sxMax;
-		let y14 = syMax;
-		x14 = sxMax - absX;
-		y14 = syMax - absY;
-		let x15 = (x14 * matD - y14 * matC) * invDet;
-		let y15 = (-x14 * matB + y14 * matA) * invDet;
-		if(x15 < view.xMin) {
-			view.xMin = x15;
-		}
-		if(x15 > view.xMax) {
-			view.xMax = x15;
-		}
-		if(y15 < view.yMin) {
-			view.yMin = y15;
-		}
-		if(y15 > view.yMax) {
-			view.yMax = y15;
-		}
-		let a = bounds.xMin;
-		let b = view.xMin;
-		bounds.xMin = a < b ? b : a;
-		let a1 = bounds.yMin;
-		let b1 = view.yMin;
-		bounds.yMin = a1 < b1 ? b1 : a1;
-		let a2 = bounds.xMax;
-		let b2 = view.xMax;
-		bounds.xMax = a2 > b2 ? b2 : a2;
-		let a3 = bounds.yMax;
-		let b3 = view.yMax;
-		bounds.yMax = a3 > b3 ? b3 : a3;
+		view.empty();
+		let x4 = sxMin;
+		let y4 = syMin;
+		x4 = sxMin - absX;
+		y4 = syMin - absY;
+		view.addPos((x4 * matD - y4 * matC) * invDet,(-x4 * matB + y4 * matA) * invDet);
+		let x5 = sxMax;
+		let y5 = syMin;
+		x5 = sxMax - absX;
+		y5 = syMin - absY;
+		view.addPos((x5 * matD - y5 * matC) * invDet,(-x5 * matB + y5 * matA) * invDet);
+		let x6 = sxMin;
+		let y6 = syMax;
+		x6 = sxMin - absX;
+		y6 = syMax - absY;
+		view.addPos((x6 * matD - y6 * matC) * invDet,(-x6 * matB + y6 * matA) * invDet);
+		let x7 = sxMax;
+		let y7 = syMax;
+		x7 = sxMax - absX;
+		y7 = syMax - absY;
+		view.addPos((x7 * matD - y7 * matC) * invDet,(-x7 * matB + y7 * matA) * invDet);
+		bounds.doIntersect(view);
 	}
 	drawFilters(ctx) {
 		if(!ctx.pushFilter(this)) {
@@ -1692,18 +1530,7 @@ class h2d_Object {
 			maxExtent = this.filter.boundsExtend;
 		} else {
 			this.filter.getBounds(this,bounds);
-			if(bounds.xMin < total.xMin) {
-				total.xMin = bounds.xMin;
-			}
-			if(bounds.xMax > total.xMax) {
-				total.xMax = bounds.xMax;
-			}
-			if(bounds.yMin < total.yMin) {
-				total.yMin = bounds.yMin;
-			}
-			if(bounds.yMax > total.yMax) {
-				total.yMax = bounds.yMax;
-			}
+			total.addBounds(bounds);
 		}
 		if(maxExtent >= 0) {
 			this.getBounds(this,bounds);
@@ -1711,24 +1538,13 @@ class h2d_Object {
 			bounds.yMin -= maxExtent;
 			bounds.xMax += maxExtent;
 			bounds.yMax += maxExtent;
-			if(bounds.xMin < total.xMin) {
-				total.xMin = bounds.xMin;
-			}
-			if(bounds.xMax > total.xMax) {
-				total.xMax = bounds.xMax;
-			}
-			if(bounds.yMin < total.yMin) {
-				total.yMin = bounds.yMin;
-			}
-			if(bounds.yMax > total.yMax) {
-				total.yMax = bounds.yMax;
-			}
+			total.addBounds(bounds);
 		}
 		this.clipBounds(ctx,total);
-		let xMin = Math.floor(total.xMin + 1e-10);
-		let yMin = Math.floor(total.yMin + 1e-10);
-		let width = Math.ceil(total.xMax - xMin - 1e-10);
-		let height = Math.ceil(total.yMax - yMin - 1e-10);
+		let xMin = hxd_Math.floor(total.xMin + 1e-10);
+		let yMin = hxd_Math.floor(total.yMin + 1e-10);
+		let width = hxd_Math.ceil(total.xMax - xMin - 1e-10);
+		let height = hxd_Math.ceil(total.yMax - yMin - 1e-10);
 		if(width <= 0 || height <= 0 || total.xMax < total.xMin) {
 			ctx.popFilter();
 			return;
@@ -1738,48 +1554,8 @@ class h2d_Object {
 		ctx.engine.clear(0);
 		let oldAlpha = ctx.globalAlpha;
 		let shader = ctx.baseShader;
-		let _this = shader.filterMatrixA__;
-		let x = _this.x;
-		let y = _this.y;
-		let z = _this.z;
-		let w = _this.w;
-		if(w == null) {
-			w = 1.;
-		}
-		if(z == null) {
-			z = 0.;
-		}
-		if(y == null) {
-			y = 0.;
-		}
-		if(x == null) {
-			x = 0.;
-		}
-		let oldA_x = x;
-		let oldA_y = y;
-		let oldA_z = z;
-		let oldA_w = w;
-		let _this1 = shader.filterMatrixB__;
-		let x1 = _this1.x;
-		let y1 = _this1.y;
-		let z1 = _this1.z;
-		let w1 = _this1.w;
-		if(w1 == null) {
-			w1 = 1.;
-		}
-		if(z1 == null) {
-			z1 = 0.;
-		}
-		if(y1 == null) {
-			y1 = 0.;
-		}
-		if(x1 == null) {
-			x1 = 0.;
-		}
-		let oldB_x = x1;
-		let oldB_y = y1;
-		let oldB_z = z1;
-		let oldB_w = w1;
+		let oldA = shader.get_filterMatrixA().clone();
+		let oldB = shader.get_filterMatrixB().clone();
 		let invDet = 1 / (this.matA * this.matD - this.matB * this.matC);
 		let invA = this.matD * invDet;
 		let invB = -this.matB * invDet;
@@ -1787,40 +1563,8 @@ class h2d_Object {
 		let invD = this.matA * invDet;
 		let invX = -(this.absX * invA + this.absY * invC);
 		let invY = -(this.absX * invB + this.absY * invD);
-		let _this2 = shader.filterMatrixA__;
-		let x2 = invA;
-		let y2 = invC;
-		let z2 = invX;
-		if(invX == null) {
-			z2 = 0.;
-		}
-		if(invC == null) {
-			y2 = 0.;
-		}
-		if(invA == null) {
-			x2 = 0.;
-		}
-		_this2.x = x2;
-		_this2.y = y2;
-		_this2.z = z2;
-		_this2.w = 1.;
-		let _this3 = shader.filterMatrixB__;
-		let x3 = invB;
-		let y3 = invD;
-		let z3 = invY;
-		if(invY == null) {
-			z3 = 0.;
-		}
-		if(invD == null) {
-			y3 = 0.;
-		}
-		if(invB == null) {
-			x3 = 0.;
-		}
-		_this3.x = x3;
-		_this3.y = y3;
-		_this3.z = z3;
-		_this3.w = 1.;
+		shader.get_filterMatrixA().set(invA,invC,invX);
+		shader.get_filterMatrixB().set(invB,invD,invY);
 		ctx.globalAlpha = 1;
 		this.draw(ctx);
 		let _g = 0;
@@ -1830,6 +1574,7 @@ class h2d_Object {
 			++_g;
 			c.drawRec(ctx);
 		}
+		ctx.flush();
 		let finalTile = h2d_Tile.fromTexture(t);
 		finalTile.dx = xMin;
 		finalTile.dy = yMin;
@@ -1839,16 +1584,8 @@ class h2d_Object {
 			finalTile.dx += xMin;
 			finalTile.dy += yMin;
 		}
-		let _this4 = shader.filterMatrixA__;
-		_this4.x = oldA_x;
-		_this4.y = oldA_y;
-		_this4.z = oldA_z;
-		_this4.w = oldA_w;
-		let _this5 = shader.filterMatrixB__;
-		_this5.x = oldB_x;
-		_this5.y = oldB_y;
-		_this5.z = oldB_z;
-		_this5.w = oldB_w;
+		shader.get_filterMatrixA().load(oldA);
+		shader.get_filterMatrixB().load(oldB);
 		ctx.popTarget();
 		ctx.popFilter();
 		ctx.globalAlpha = oldAlpha;
@@ -1864,6 +1601,7 @@ class h2d_Object {
 		ctx.globalAlpha *= this.alpha;
 		this.emitTile(ctx,tile);
 		ctx.globalAlpha = oldAlpha;
+		ctx.flush();
 		ctx.inFilterBlend = null;
 		ctx.currentBlend = null;
 	}
@@ -1908,6 +1646,26 @@ class h2d_Object {
 			ctx.globalAlpha = old;
 		}
 	}
+	set_x(v) {
+		this.posChanged = true;
+		return this.x = v;
+	}
+	set_y(v) {
+		this.posChanged = true;
+		return this.y = v;
+	}
+	set_scaleX(v) {
+		this.posChanged = true;
+		return this.scaleX = v;
+	}
+	set_scaleY(v) {
+		this.posChanged = true;
+		return this.scaleY = v;
+	}
+	set_rotation(v) {
+		this.posChanged = true;
+		return this.rotation = v;
+	}
 	contentChanged(s) {
 	}
 }
@@ -1930,9 +1688,86 @@ class h2d_Drawable extends h2d_Object {
 		if(tile == null) {
 			tile = new h2d_Tile(null,0,0,5,5);
 		}
-		if(!ctx.drawTile(this,tile)) {
+		if(!ctx.hasBuffering()) {
+			if(!ctx.drawTile(this,tile)) {
+				return;
+			}
 			return;
 		}
+		if(!ctx.beginDrawBatch(this,tile.getTexture())) {
+			return;
+		}
+		let alpha = this.color.get_a() * ctx.globalAlpha;
+		let ax = this.absX + tile.dx * this.matA + tile.dy * this.matC;
+		let ay = this.absY + tile.dx * this.matB + tile.dy * this.matD;
+		let buf = ctx.buffer;
+		let pos = ctx.bufPos;
+		let _g = buf.pos;
+		let _g1 = pos + 32;
+		while(_g < _g1) {
+			++_g;
+			if(buf.pos == buf.array.length) {
+				let newSize = buf.array.length << 1;
+				if(newSize < 128) {
+					newSize = 128;
+				}
+				let newArray = new Float32Array(newSize);
+				newArray.set(buf.array);
+				buf.array = newArray;
+			}
+			buf.array[buf.pos++] = 0.;
+		}
+		buf.array[pos++] = ax;
+		buf.array[pos++] = ay;
+		buf.array[pos++] = tile.u;
+		buf.array[pos++] = tile.v;
+		let v = this.color.get_r();
+		buf.array[pos++] = v;
+		let v1 = this.color.get_g();
+		buf.array[pos++] = v1;
+		let v2 = this.color.get_b();
+		buf.array[pos++] = v2;
+		buf.array[pos++] = alpha;
+		let tw = tile.width;
+		let th = tile.height;
+		let dx1 = tw * this.matA;
+		let dy1 = tw * this.matB;
+		let dx2 = th * this.matC;
+		let dy2 = th * this.matD;
+		buf.array[pos++] = ax + dx1;
+		buf.array[pos++] = ay + dy1;
+		buf.array[pos++] = tile.u2;
+		buf.array[pos++] = tile.v;
+		let v3 = this.color.get_r();
+		buf.array[pos++] = v3;
+		let v4 = this.color.get_g();
+		buf.array[pos++] = v4;
+		let v5 = this.color.get_b();
+		buf.array[pos++] = v5;
+		buf.array[pos++] = alpha;
+		buf.array[pos++] = ax + dx2;
+		buf.array[pos++] = ay + dy2;
+		buf.array[pos++] = tile.u;
+		buf.array[pos++] = tile.v2;
+		let v6 = this.color.get_r();
+		buf.array[pos++] = v6;
+		let v7 = this.color.get_g();
+		buf.array[pos++] = v7;
+		let v8 = this.color.get_b();
+		buf.array[pos++] = v8;
+		buf.array[pos++] = alpha;
+		buf.array[pos++] = ax + dx1 + dx2;
+		buf.array[pos++] = ay + dy1 + dy2;
+		buf.array[pos++] = tile.u2;
+		buf.array[pos++] = tile.v2;
+		let v9 = this.color.get_r();
+		buf.array[pos++] = v9;
+		let v10 = this.color.get_g();
+		buf.array[pos++] = v10;
+		let v11 = this.color.get_b();
+		buf.array[pos++] = v11;
+		buf.array[pos++] = alpha;
+		ctx.bufPos = pos;
 	}
 }
 h2d_Drawable.__name__ = "h2d.Drawable";
@@ -1971,6 +1806,10 @@ h2d_GPoint.__name__ = "h2d.GPoint";
 Object.assign(h2d_GPoint.prototype, {
 	__class__: h2d_GPoint
 });
+class hxd_impl__$Serializable_NoSerializeSupport {
+}
+hxd_impl__$Serializable_NoSerializeSupport.__name__ = "hxd.impl._Serializable.NoSerializeSupport";
+hxd_impl__$Serializable_NoSerializeSupport.__isInterface__ = true;
 class h3d_prim_Primitive {
 	constructor() {
 		this.refCount = 0;
@@ -1997,9 +1836,9 @@ class h3d_prim_Primitive {
 		}
 		if(this.indexes == null) {
 			if((this.buffer.flags & 4) != 0) {
-				engine.renderBuffer(this.buffer,engine.mem.quadIndexes,2,0,-1);
+				engine.renderQuadBuffer(this.buffer);
 			} else {
-				engine.renderBuffer(this.buffer,engine.mem.triIndexes,3,0,-1);
+				engine.renderTriBuffer(this.buffer);
 			}
 		} else {
 			engine.renderIndexed(this.buffer,this.indexes);
@@ -2016,11 +1855,11 @@ class h3d_prim_Primitive {
 		}
 	}
 	toString() {
-		let c = js_Boot.getClass(this);
-		return c.__name__.split(".").pop();
+		return Type.getClassName(Type.getClass(this)).split(".").pop();
 	}
 }
 h3d_prim_Primitive.__name__ = "h3d.prim.Primitive";
+h3d_prim_Primitive.__interfaces__ = [hxd_impl__$Serializable_NoSerializeSupport];
 Object.assign(h3d_prim_Primitive.prototype, {
 	__class__: h3d_prim_Primitive
 });
@@ -2028,6 +1867,101 @@ class h2d__$Graphics_GraphicsContent extends h3d_prim_Primitive {
 	constructor() {
 		super();
 		this.buffers = [];
+	}
+	addIndex(i) {
+		this.index.push(i);
+		this.indexDirty = true;
+	}
+	add(x,y,u,v,r,g,b,a) {
+		let this1 = this.tmp;
+		if(this1.pos == this1.array.length) {
+			let newSize = this1.array.length << 1;
+			if(newSize < 128) {
+				newSize = 128;
+			}
+			let newArray = new Float32Array(newSize);
+			newArray.set(this1.array);
+			this1.array = newArray;
+		}
+		this1.array[this1.pos++] = x;
+		let this2 = this.tmp;
+		if(this2.pos == this2.array.length) {
+			let newSize = this2.array.length << 1;
+			if(newSize < 128) {
+				newSize = 128;
+			}
+			let newArray = new Float32Array(newSize);
+			newArray.set(this2.array);
+			this2.array = newArray;
+		}
+		this2.array[this2.pos++] = y;
+		let this3 = this.tmp;
+		if(this3.pos == this3.array.length) {
+			let newSize = this3.array.length << 1;
+			if(newSize < 128) {
+				newSize = 128;
+			}
+			let newArray = new Float32Array(newSize);
+			newArray.set(this3.array);
+			this3.array = newArray;
+		}
+		this3.array[this3.pos++] = u;
+		let this4 = this.tmp;
+		if(this4.pos == this4.array.length) {
+			let newSize = this4.array.length << 1;
+			if(newSize < 128) {
+				newSize = 128;
+			}
+			let newArray = new Float32Array(newSize);
+			newArray.set(this4.array);
+			this4.array = newArray;
+		}
+		this4.array[this4.pos++] = v;
+		let this5 = this.tmp;
+		if(this5.pos == this5.array.length) {
+			let newSize = this5.array.length << 1;
+			if(newSize < 128) {
+				newSize = 128;
+			}
+			let newArray = new Float32Array(newSize);
+			newArray.set(this5.array);
+			this5.array = newArray;
+		}
+		this5.array[this5.pos++] = r;
+		let this6 = this.tmp;
+		if(this6.pos == this6.array.length) {
+			let newSize = this6.array.length << 1;
+			if(newSize < 128) {
+				newSize = 128;
+			}
+			let newArray = new Float32Array(newSize);
+			newArray.set(this6.array);
+			this6.array = newArray;
+		}
+		this6.array[this6.pos++] = g;
+		let this7 = this.tmp;
+		if(this7.pos == this7.array.length) {
+			let newSize = this7.array.length << 1;
+			if(newSize < 128) {
+				newSize = 128;
+			}
+			let newArray = new Float32Array(newSize);
+			newArray.set(this7.array);
+			this7.array = newArray;
+		}
+		this7.array[this7.pos++] = b;
+		let this8 = this.tmp;
+		if(this8.pos == this8.array.length) {
+			let newSize = this8.array.length << 1;
+			if(newSize < 128) {
+				newSize = 128;
+			}
+			let newArray = new Float32Array(newSize);
+			newArray.set(this8.array);
+			this8.array = newArray;
+		}
+		this8.array[this8.pos++] = a;
+		this.bufferDirty = true;
 	}
 	next() {
 		let nvect = this.tmp.pos >> 3;
@@ -2067,8 +2001,19 @@ class h2d__$Graphics_GraphicsContent extends h3d_prim_Primitive {
 		if(this.index.length <= 0) {
 			return;
 		}
+		this.flush();
+		let _g = 0;
+		let _g1 = this.buffers;
+		while(_g < _g1.length) {
+			let b = _g1[_g];
+			++_g;
+			engine.renderIndexed(b.vbuf,b.ibuf);
+		}
+		super.render(engine);
+	}
+	flush() {
 		if(this.buffer == null || this.buffer.isDisposed()) {
-			this.alloc(h3d_Engine.CURRENT);
+			this.alloc(h3d_Engine.getCurrent());
 		} else {
 			if(this.bufferDirty) {
 				this.buffer.dispose();
@@ -2081,14 +2026,6 @@ class h2d__$Graphics_GraphicsContent extends h3d_prim_Primitive {
 				this.indexDirty = false;
 			}
 		}
-		let _g = 0;
-		let _g1 = this.buffers;
-		while(_g < _g1.length) {
-			let b = _g1[_g];
-			++_g;
-			engine.renderIndexed(b.vbuf,b.ibuf);
-		}
-		super.render(engine);
 	}
 	dispose() {
 		let _g = 0;
@@ -2150,10 +2087,10 @@ class h2d_Graphics extends h2d_Drawable {
 		this.tmpPoints = [];
 		this.pindex = 0;
 		this.lineSize = 0;
-		this.xMin = Infinity;
-		this.yMin = Infinity;
-		this.yMax = -Infinity;
-		this.xMax = -Infinity;
+		this.xMin = hxd_Math.get_POSITIVE_INFINITY();
+		this.yMin = hxd_Math.get_POSITIVE_INFINITY();
+		this.yMax = hxd_Math.get_NEGATIVE_INFINITY();
+		this.xMax = hxd_Math.get_NEGATIVE_INFINITY();
 	}
 	getBoundsRec(relativeTo,out,forSize) {
 		super.getBoundsRec(relativeTo,out,forSize);
@@ -2215,13 +2152,13 @@ class h2d_Graphics extends h2d_Drawable {
 			let next = pts[(i + 1) % pts.length];
 			let nx1 = prev.y - p.y;
 			let ny1 = p.x - prev.x;
-			let ns1 = 1. / Math.sqrt(nx1 * nx1 + ny1 * ny1);
+			let ns1 = hxd_Math.invSqrt(nx1 * nx1 + ny1 * ny1);
 			let nx2 = p.y - next.y;
 			let ny2 = next.x - p.x;
-			let ns2 = 1. / Math.sqrt(nx2 * nx2 + ny2 * ny2);
+			let ns2 = hxd_Math.invSqrt(nx2 * nx2 + ny2 * ny2);
 			let nx = nx1 * ns1 + nx2 * ns2;
 			let ny = ny1 * ns1 + ny2 * ns2;
-			let ns = 1. / Math.sqrt(nx * nx + ny * ny);
+			let ns = hxd_Math.invSqrt(nx * nx + ny * ny);
 			nx *= ns;
 			ny *= ns;
 			let size = nx * nx1 * ns1 + ny * ny1 * ns1;
@@ -2232,218 +2169,16 @@ class h2d_Graphics extends h2d_Drawable {
 			nx *= d;
 			ny *= d;
 			if(size > this.bevel) {
-				let _this = this.content;
-				let x = p.x + nx;
-				let y = p.y + ny;
-				let r = p.r;
-				let g = p.g;
-				let b = p.b;
-				let a = p.a;
-				let this1 = _this.tmp;
-				if(this1.pos == this1.array.length) {
-					let newSize = this1.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this1.array);
-					this1.array = newArray;
-				}
-				this1.array[this1.pos++] = x;
-				let this2 = _this.tmp;
-				if(this2.pos == this2.array.length) {
-					let newSize = this2.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this2.array);
-					this2.array = newArray;
-				}
-				this2.array[this2.pos++] = y;
-				let this3 = _this.tmp;
-				if(this3.pos == this3.array.length) {
-					let newSize = this3.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this3.array);
-					this3.array = newArray;
-				}
-				this3.array[this3.pos++] = 0;
-				let this4 = _this.tmp;
-				if(this4.pos == this4.array.length) {
-					let newSize = this4.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this4.array);
-					this4.array = newArray;
-				}
-				this4.array[this4.pos++] = 0;
-				let this5 = _this.tmp;
-				if(this5.pos == this5.array.length) {
-					let newSize = this5.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this5.array);
-					this5.array = newArray;
-				}
-				this5.array[this5.pos++] = r;
-				let this6 = _this.tmp;
-				if(this6.pos == this6.array.length) {
-					let newSize = this6.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this6.array);
-					this6.array = newArray;
-				}
-				this6.array[this6.pos++] = g;
-				let this7 = _this.tmp;
-				if(this7.pos == this7.array.length) {
-					let newSize = this7.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this7.array);
-					this7.array = newArray;
-				}
-				this7.array[this7.pos++] = b;
-				let this8 = _this.tmp;
-				if(this8.pos == this8.array.length) {
-					let newSize = this8.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this8.array);
-					this8.array = newArray;
-				}
-				this8.array[this8.pos++] = a;
-				_this.bufferDirty = true;
-				let _this1 = this.content;
-				let x1 = p.x - nx;
-				let y1 = p.y - ny;
-				let r1 = p.r;
-				let g1 = p.g;
-				let b1 = p.b;
-				let a1 = p.a;
-				let this9 = _this1.tmp;
-				if(this9.pos == this9.array.length) {
-					let newSize = this9.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this9.array);
-					this9.array = newArray;
-				}
-				this9.array[this9.pos++] = x1;
-				let this10 = _this1.tmp;
-				if(this10.pos == this10.array.length) {
-					let newSize = this10.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this10.array);
-					this10.array = newArray;
-				}
-				this10.array[this10.pos++] = y1;
-				let this11 = _this1.tmp;
-				if(this11.pos == this11.array.length) {
-					let newSize = this11.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this11.array);
-					this11.array = newArray;
-				}
-				this11.array[this11.pos++] = 0;
-				let this12 = _this1.tmp;
-				if(this12.pos == this12.array.length) {
-					let newSize = this12.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this12.array);
-					this12.array = newArray;
-				}
-				this12.array[this12.pos++] = 0;
-				let this13 = _this1.tmp;
-				if(this13.pos == this13.array.length) {
-					let newSize = this13.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this13.array);
-					this13.array = newArray;
-				}
-				this13.array[this13.pos++] = r1;
-				let this14 = _this1.tmp;
-				if(this14.pos == this14.array.length) {
-					let newSize = this14.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this14.array);
-					this14.array = newArray;
-				}
-				this14.array[this14.pos++] = g1;
-				let this15 = _this1.tmp;
-				if(this15.pos == this15.array.length) {
-					let newSize = this15.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this15.array);
-					this15.array = newArray;
-				}
-				this15.array[this15.pos++] = b1;
-				let this16 = _this1.tmp;
-				if(this16.pos == this16.array.length) {
-					let newSize = this16.array.length << 1;
-					if(newSize < 128) {
-						newSize = 128;
-					}
-					let newArray = new Float32Array(newSize);
-					newArray.set(this16.array);
-					this16.array = newArray;
-				}
-				this16.array[this16.pos++] = a1;
-				_this1.bufferDirty = true;
+				this.content.add(p.x + nx,p.y + ny,0,0,p.r,p.g,p.b,p.a);
+				this.content.add(p.x - nx,p.y - ny,0,0,p.r,p.g,p.b,p.a);
 				let pnext = i == last ? start : this.pindex + 2;
 				if(i < count - 1 || closed) {
-					let _this = this.content;
-					_this.index.push(this.pindex);
-					_this.indexDirty = true;
-					let _this1 = this.content;
-					_this1.index.push(this.pindex + 1);
-					_this1.indexDirty = true;
-					let _this2 = this.content;
-					_this2.index.push(pnext);
-					_this2.indexDirty = true;
-					let _this3 = this.content;
-					_this3.index.push(this.pindex + 1);
-					_this3.indexDirty = true;
-					let _this4 = this.content;
-					_this4.index.push(pnext);
-					_this4.indexDirty = true;
-					let _this5 = this.content;
-					_this5.index.push(pnext + 1);
-					_this5.indexDirty = true;
+					this.content.addIndex(this.pindex);
+					this.content.addIndex(this.pindex + 1);
+					this.content.addIndex(pnext);
+					this.content.addIndex(this.pindex + 1);
+					this.content.addIndex(pnext);
+					this.content.addIndex(pnext + 1);
 				}
 				this.pindex += 2;
 			} else {
@@ -2458,629 +2193,29 @@ class h2d_Graphics extends h2d_Drawable {
 				nny *= d;
 				let pnext = i == last ? start : this.pindex + 3;
 				if(sign > 0) {
-					let _this = this.content;
-					let x = p.x + nx;
-					let y = p.y + ny;
-					let r = p.r;
-					let g = p.g;
-					let b = p.b;
-					let a = p.a;
-					let this1 = _this.tmp;
-					if(this1.pos == this1.array.length) {
-						let newSize = this1.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this1.array);
-						this1.array = newArray;
-					}
-					this1.array[this1.pos++] = x;
-					let this2 = _this.tmp;
-					if(this2.pos == this2.array.length) {
-						let newSize = this2.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this2.array);
-						this2.array = newArray;
-					}
-					this2.array[this2.pos++] = y;
-					let this3 = _this.tmp;
-					if(this3.pos == this3.array.length) {
-						let newSize = this3.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this3.array);
-						this3.array = newArray;
-					}
-					this3.array[this3.pos++] = 0;
-					let this4 = _this.tmp;
-					if(this4.pos == this4.array.length) {
-						let newSize = this4.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this4.array);
-						this4.array = newArray;
-					}
-					this4.array[this4.pos++] = 0;
-					let this5 = _this.tmp;
-					if(this5.pos == this5.array.length) {
-						let newSize = this5.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this5.array);
-						this5.array = newArray;
-					}
-					this5.array[this5.pos++] = r;
-					let this6 = _this.tmp;
-					if(this6.pos == this6.array.length) {
-						let newSize = this6.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this6.array);
-						this6.array = newArray;
-					}
-					this6.array[this6.pos++] = g;
-					let this7 = _this.tmp;
-					if(this7.pos == this7.array.length) {
-						let newSize = this7.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this7.array);
-						this7.array = newArray;
-					}
-					this7.array[this7.pos++] = b;
-					let this8 = _this.tmp;
-					if(this8.pos == this8.array.length) {
-						let newSize = this8.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this8.array);
-						this8.array = newArray;
-					}
-					this8.array[this8.pos++] = a;
-					_this.bufferDirty = true;
-					let _this1 = this.content;
-					let x1 = p.x - nnx;
-					let y1 = p.y - nny;
-					let r1 = p.r;
-					let g1 = p.g;
-					let b1 = p.b;
-					let a1 = p.a;
-					let this9 = _this1.tmp;
-					if(this9.pos == this9.array.length) {
-						let newSize = this9.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this9.array);
-						this9.array = newArray;
-					}
-					this9.array[this9.pos++] = x1;
-					let this10 = _this1.tmp;
-					if(this10.pos == this10.array.length) {
-						let newSize = this10.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this10.array);
-						this10.array = newArray;
-					}
-					this10.array[this10.pos++] = y1;
-					let this11 = _this1.tmp;
-					if(this11.pos == this11.array.length) {
-						let newSize = this11.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this11.array);
-						this11.array = newArray;
-					}
-					this11.array[this11.pos++] = 0;
-					let this12 = _this1.tmp;
-					if(this12.pos == this12.array.length) {
-						let newSize = this12.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this12.array);
-						this12.array = newArray;
-					}
-					this12.array[this12.pos++] = 0;
-					let this13 = _this1.tmp;
-					if(this13.pos == this13.array.length) {
-						let newSize = this13.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this13.array);
-						this13.array = newArray;
-					}
-					this13.array[this13.pos++] = r1;
-					let this14 = _this1.tmp;
-					if(this14.pos == this14.array.length) {
-						let newSize = this14.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this14.array);
-						this14.array = newArray;
-					}
-					this14.array[this14.pos++] = g1;
-					let this15 = _this1.tmp;
-					if(this15.pos == this15.array.length) {
-						let newSize = this15.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this15.array);
-						this15.array = newArray;
-					}
-					this15.array[this15.pos++] = b1;
-					let this16 = _this1.tmp;
-					if(this16.pos == this16.array.length) {
-						let newSize = this16.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this16.array);
-						this16.array = newArray;
-					}
-					this16.array[this16.pos++] = a1;
-					_this1.bufferDirty = true;
-					let _this2 = this.content;
-					let x2 = p.x + nnx;
-					let y2 = p.y + nny;
-					let r2 = p.r;
-					let g2 = p.g;
-					let b2 = p.b;
-					let a2 = p.a;
-					let this17 = _this2.tmp;
-					if(this17.pos == this17.array.length) {
-						let newSize = this17.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this17.array);
-						this17.array = newArray;
-					}
-					this17.array[this17.pos++] = x2;
-					let this18 = _this2.tmp;
-					if(this18.pos == this18.array.length) {
-						let newSize = this18.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this18.array);
-						this18.array = newArray;
-					}
-					this18.array[this18.pos++] = y2;
-					let this19 = _this2.tmp;
-					if(this19.pos == this19.array.length) {
-						let newSize = this19.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this19.array);
-						this19.array = newArray;
-					}
-					this19.array[this19.pos++] = 0;
-					let this20 = _this2.tmp;
-					if(this20.pos == this20.array.length) {
-						let newSize = this20.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this20.array);
-						this20.array = newArray;
-					}
-					this20.array[this20.pos++] = 0;
-					let this21 = _this2.tmp;
-					if(this21.pos == this21.array.length) {
-						let newSize = this21.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this21.array);
-						this21.array = newArray;
-					}
-					this21.array[this21.pos++] = r2;
-					let this22 = _this2.tmp;
-					if(this22.pos == this22.array.length) {
-						let newSize = this22.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this22.array);
-						this22.array = newArray;
-					}
-					this22.array[this22.pos++] = g2;
-					let this23 = _this2.tmp;
-					if(this23.pos == this23.array.length) {
-						let newSize = this23.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this23.array);
-						this23.array = newArray;
-					}
-					this23.array[this23.pos++] = b2;
-					let this24 = _this2.tmp;
-					if(this24.pos == this24.array.length) {
-						let newSize = this24.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this24.array);
-						this24.array = newArray;
-					}
-					this24.array[this24.pos++] = a2;
-					_this2.bufferDirty = true;
-					let _this3 = this.content;
-					_this3.index.push(this.pindex);
-					_this3.indexDirty = true;
-					let _this4 = this.content;
-					_this4.index.push(pnext);
-					_this4.indexDirty = true;
-					let _this5 = this.content;
-					_this5.index.push(this.pindex + 2);
-					_this5.indexDirty = true;
-					let _this6 = this.content;
-					_this6.index.push(this.pindex + 2);
-					_this6.indexDirty = true;
-					let _this7 = this.content;
-					_this7.index.push(pnext);
-					_this7.indexDirty = true;
-					let _this8 = this.content;
-					_this8.index.push(pnext + 1);
-					_this8.indexDirty = true;
+					this.content.add(p.x + nx,p.y + ny,0,0,p.r,p.g,p.b,p.a);
+					this.content.add(p.x - nnx,p.y - nny,0,0,p.r,p.g,p.b,p.a);
+					this.content.add(p.x + nnx,p.y + nny,0,0,p.r,p.g,p.b,p.a);
+					this.content.addIndex(this.pindex);
+					this.content.addIndex(pnext);
+					this.content.addIndex(this.pindex + 2);
+					this.content.addIndex(this.pindex + 2);
+					this.content.addIndex(pnext);
+					this.content.addIndex(pnext + 1);
 				} else {
-					let _this = this.content;
-					let x = p.x + nnx;
-					let y = p.y + nny;
-					let r = p.r;
-					let g = p.g;
-					let b = p.b;
-					let a = p.a;
-					let this1 = _this.tmp;
-					if(this1.pos == this1.array.length) {
-						let newSize = this1.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this1.array);
-						this1.array = newArray;
-					}
-					this1.array[this1.pos++] = x;
-					let this2 = _this.tmp;
-					if(this2.pos == this2.array.length) {
-						let newSize = this2.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this2.array);
-						this2.array = newArray;
-					}
-					this2.array[this2.pos++] = y;
-					let this3 = _this.tmp;
-					if(this3.pos == this3.array.length) {
-						let newSize = this3.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this3.array);
-						this3.array = newArray;
-					}
-					this3.array[this3.pos++] = 0;
-					let this4 = _this.tmp;
-					if(this4.pos == this4.array.length) {
-						let newSize = this4.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this4.array);
-						this4.array = newArray;
-					}
-					this4.array[this4.pos++] = 0;
-					let this5 = _this.tmp;
-					if(this5.pos == this5.array.length) {
-						let newSize = this5.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this5.array);
-						this5.array = newArray;
-					}
-					this5.array[this5.pos++] = r;
-					let this6 = _this.tmp;
-					if(this6.pos == this6.array.length) {
-						let newSize = this6.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this6.array);
-						this6.array = newArray;
-					}
-					this6.array[this6.pos++] = g;
-					let this7 = _this.tmp;
-					if(this7.pos == this7.array.length) {
-						let newSize = this7.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this7.array);
-						this7.array = newArray;
-					}
-					this7.array[this7.pos++] = b;
-					let this8 = _this.tmp;
-					if(this8.pos == this8.array.length) {
-						let newSize = this8.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this8.array);
-						this8.array = newArray;
-					}
-					this8.array[this8.pos++] = a;
-					_this.bufferDirty = true;
-					let _this1 = this.content;
-					let x1 = p.x - nx;
-					let y1 = p.y - ny;
-					let r1 = p.r;
-					let g1 = p.g;
-					let b1 = p.b;
-					let a1 = p.a;
-					let this9 = _this1.tmp;
-					if(this9.pos == this9.array.length) {
-						let newSize = this9.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this9.array);
-						this9.array = newArray;
-					}
-					this9.array[this9.pos++] = x1;
-					let this10 = _this1.tmp;
-					if(this10.pos == this10.array.length) {
-						let newSize = this10.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this10.array);
-						this10.array = newArray;
-					}
-					this10.array[this10.pos++] = y1;
-					let this11 = _this1.tmp;
-					if(this11.pos == this11.array.length) {
-						let newSize = this11.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this11.array);
-						this11.array = newArray;
-					}
-					this11.array[this11.pos++] = 0;
-					let this12 = _this1.tmp;
-					if(this12.pos == this12.array.length) {
-						let newSize = this12.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this12.array);
-						this12.array = newArray;
-					}
-					this12.array[this12.pos++] = 0;
-					let this13 = _this1.tmp;
-					if(this13.pos == this13.array.length) {
-						let newSize = this13.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this13.array);
-						this13.array = newArray;
-					}
-					this13.array[this13.pos++] = r1;
-					let this14 = _this1.tmp;
-					if(this14.pos == this14.array.length) {
-						let newSize = this14.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this14.array);
-						this14.array = newArray;
-					}
-					this14.array[this14.pos++] = g1;
-					let this15 = _this1.tmp;
-					if(this15.pos == this15.array.length) {
-						let newSize = this15.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this15.array);
-						this15.array = newArray;
-					}
-					this15.array[this15.pos++] = b1;
-					let this16 = _this1.tmp;
-					if(this16.pos == this16.array.length) {
-						let newSize = this16.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this16.array);
-						this16.array = newArray;
-					}
-					this16.array[this16.pos++] = a1;
-					_this1.bufferDirty = true;
-					let _this2 = this.content;
-					let x2 = p.x - nnx;
-					let y2 = p.y - nny;
-					let r2 = p.r;
-					let g2 = p.g;
-					let b2 = p.b;
-					let a2 = p.a;
-					let this17 = _this2.tmp;
-					if(this17.pos == this17.array.length) {
-						let newSize = this17.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this17.array);
-						this17.array = newArray;
-					}
-					this17.array[this17.pos++] = x2;
-					let this18 = _this2.tmp;
-					if(this18.pos == this18.array.length) {
-						let newSize = this18.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this18.array);
-						this18.array = newArray;
-					}
-					this18.array[this18.pos++] = y2;
-					let this19 = _this2.tmp;
-					if(this19.pos == this19.array.length) {
-						let newSize = this19.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this19.array);
-						this19.array = newArray;
-					}
-					this19.array[this19.pos++] = 0;
-					let this20 = _this2.tmp;
-					if(this20.pos == this20.array.length) {
-						let newSize = this20.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this20.array);
-						this20.array = newArray;
-					}
-					this20.array[this20.pos++] = 0;
-					let this21 = _this2.tmp;
-					if(this21.pos == this21.array.length) {
-						let newSize = this21.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this21.array);
-						this21.array = newArray;
-					}
-					this21.array[this21.pos++] = r2;
-					let this22 = _this2.tmp;
-					if(this22.pos == this22.array.length) {
-						let newSize = this22.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this22.array);
-						this22.array = newArray;
-					}
-					this22.array[this22.pos++] = g2;
-					let this23 = _this2.tmp;
-					if(this23.pos == this23.array.length) {
-						let newSize = this23.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this23.array);
-						this23.array = newArray;
-					}
-					this23.array[this23.pos++] = b2;
-					let this24 = _this2.tmp;
-					if(this24.pos == this24.array.length) {
-						let newSize = this24.array.length << 1;
-						if(newSize < 128) {
-							newSize = 128;
-						}
-						let newArray = new Float32Array(newSize);
-						newArray.set(this24.array);
-						this24.array = newArray;
-					}
-					this24.array[this24.pos++] = a2;
-					_this2.bufferDirty = true;
-					let _this3 = this.content;
-					_this3.index.push(this.pindex + 1);
-					_this3.indexDirty = true;
-					let _this4 = this.content;
-					_this4.index.push(pnext);
-					_this4.indexDirty = true;
-					let _this5 = this.content;
-					_this5.index.push(this.pindex + 2);
-					_this5.indexDirty = true;
-					let _this6 = this.content;
-					_this6.index.push(this.pindex + 1);
-					_this6.indexDirty = true;
-					let _this7 = this.content;
-					_this7.index.push(pnext);
-					_this7.indexDirty = true;
-					let _this8 = this.content;
-					_this8.index.push(pnext + 1);
-					_this8.indexDirty = true;
+					this.content.add(p.x + nnx,p.y + nny,0,0,p.r,p.g,p.b,p.a);
+					this.content.add(p.x - nx,p.y - ny,0,0,p.r,p.g,p.b,p.a);
+					this.content.add(p.x - nnx,p.y - nny,0,0,p.r,p.g,p.b,p.a);
+					this.content.addIndex(this.pindex + 1);
+					this.content.addIndex(pnext);
+					this.content.addIndex(this.pindex + 2);
+					this.content.addIndex(this.pindex + 1);
+					this.content.addIndex(pnext);
+					this.content.addIndex(pnext + 1);
 				}
-				let _this = this.content;
-				_this.index.push(this.pindex);
-				_this.indexDirty = true;
-				let _this1 = this.content;
-				_this1.index.push(this.pindex + 1);
-				_this1.indexDirty = true;
-				let _this2 = this.content;
-				_this2.index.push(this.pindex + 2);
-				_this2.indexDirty = true;
+				this.content.addIndex(this.pindex);
+				this.content.addIndex(this.pindex + 1);
+				this.content.addIndex(this.pindex + 2);
 				this.pindex += 3;
 			}
 			prev = p;
@@ -3095,15 +2230,7 @@ class h2d_Graphics extends h2d_Drawable {
 		let p0 = pts[0];
 		let p1 = pts[pts.length - 1];
 		let last = null;
-		let tmp;
-		let f = p0.x - p1.x;
-		if((f < 0 ? -f : f) < 1e-9) {
-			let f = p0.y - p1.y;
-			tmp = (f < 0 ? -f : f) < 1e-9;
-		} else {
-			tmp = false;
-		}
-		if(tmp) {
+		if(hxd_Math.abs(p0.x - p1.x) < 1e-9 && hxd_Math.abs(p0.y - p1.y) < 1e-9) {
 			last = pts.pop();
 		}
 		if(this.isConvex(pts)) {
@@ -3111,15 +2238,9 @@ class h2d_Graphics extends h2d_Drawable {
 			let _g1 = pts.length - 1;
 			while(_g < _g1) {
 				let i = _g++;
-				let _this = this.content;
-				_this.index.push(i0);
-				_this.indexDirty = true;
-				let _this1 = this.content;
-				_this1.index.push(i0 + i);
-				_this1.indexDirty = true;
-				let _this2 = this.content;
-				_this2.index.push(i0 + i + 1);
-				_this2.indexDirty = true;
+				this.content.addIndex(i0);
+				this.content.addIndex(i0 + i);
+				this.content.addIndex(i0 + i + 1);
 			}
 		} else {
 			let ear = h2d_Graphics.EARCUT;
@@ -3132,9 +2253,7 @@ class h2d_Graphics extends h2d_Drawable {
 			while(_g < _g1.length) {
 				let i = _g1[_g];
 				++_g;
-				let _this = this.content;
-				_this.index.push(i + i0);
-				_this.indexDirty = true;
+				this.content.addIndex(i + i0);
 			}
 		}
 		if(last != null) {
@@ -3168,14 +2287,7 @@ class h2d_Graphics extends h2d_Drawable {
 			color = 0;
 		}
 		this.flush();
-		let alpha1 = alpha;
-		if(alpha == null) {
-			alpha1 = 1.;
-		}
-		this.curA = alpha1;
-		this.curR = (color >> 16 & 255) / 255.;
-		this.curG = (color >> 8 & 255) / 255.;
-		this.curB = (color & 255) / 255.;
+		this.setColor(color,alpha);
 		this.doFill = true;
 	}
 	lineStyle(size,color,alpha) {
@@ -3195,9 +2307,22 @@ class h2d_Graphics extends h2d_Drawable {
 		this.lineG = (color >> 8 & 255) / 255.;
 		this.lineB = (color & 255) / 255.;
 	}
+	moveTo(x,y) {
+		this.flush();
+		this.lineTo(x,y);
+	}
 	endFill() {
 		this.flush();
 		this.doFill = false;
+	}
+	setColor(color,alpha) {
+		if(alpha == null) {
+			alpha = 1.;
+		}
+		this.curA = alpha;
+		this.curR = (color >> 16 & 255) / 255.;
+		this.curG = (color >> 8 & 255) / 255.;
+		this.curB = (color & 255) / 255.;
 	}
 	drawCircle(cx,cy,radius,nsegments) {
 		if(nsegments == null) {
@@ -3205,8 +2330,7 @@ class h2d_Graphics extends h2d_Drawable {
 		}
 		this.flush();
 		if(nsegments == 0) {
-			let f = radius * 3.14 * 2 / 4;
-			nsegments = Math.ceil(f < 0 ? -f : f);
+			nsegments = hxd_Math.ceil(hxd_Math.abs(radius * 3.14 * 2 / 4));
 		}
 		if(nsegments < 3) {
 			nsegments = 3;
@@ -3217,11 +2341,12 @@ class h2d_Graphics extends h2d_Drawable {
 		while(_g < _g1) {
 			let i = _g++;
 			let a = i * angle;
-			let x = cx + Math.cos(a) * radius;
-			let y = cy + Math.sin(a) * radius;
-			this.addVertex(x,y,this.curR,this.curG,this.curB,this.curA,x * this.ma + y * this.mc + this.mx,x * this.mb + y * this.md + this.my);
+			this.lineTo(cx + hxd_Math.cos(a) * radius,cy + hxd_Math.sin(a) * radius);
 		}
 		this.flush();
+	}
+	lineTo(x,y) {
+		this.addVertex(x,y,this.curR,this.curG,this.curB,this.curA,x * this.ma + y * this.mc + this.mx,x * this.mb + y * this.md + this.my);
 	}
 	addVertex(x,y,r,g,b,a,u,v) {
 		if(v == null) {
@@ -3243,103 +2368,14 @@ class h2d_Graphics extends h2d_Drawable {
 			this.yMax = y;
 		}
 		if(this.doFill) {
-			let _this = this.content;
-			let this1 = _this.tmp;
-			if(this1.pos == this1.array.length) {
-				let newSize = this1.array.length << 1;
-				if(newSize < 128) {
-					newSize = 128;
-				}
-				let newArray = new Float32Array(newSize);
-				newArray.set(this1.array);
-				this1.array = newArray;
-			}
-			this1.array[this1.pos++] = x;
-			let this2 = _this.tmp;
-			if(this2.pos == this2.array.length) {
-				let newSize = this2.array.length << 1;
-				if(newSize < 128) {
-					newSize = 128;
-				}
-				let newArray = new Float32Array(newSize);
-				newArray.set(this2.array);
-				this2.array = newArray;
-			}
-			this2.array[this2.pos++] = y;
-			let this3 = _this.tmp;
-			if(this3.pos == this3.array.length) {
-				let newSize = this3.array.length << 1;
-				if(newSize < 128) {
-					newSize = 128;
-				}
-				let newArray = new Float32Array(newSize);
-				newArray.set(this3.array);
-				this3.array = newArray;
-			}
-			this3.array[this3.pos++] = u;
-			let this4 = _this.tmp;
-			if(this4.pos == this4.array.length) {
-				let newSize = this4.array.length << 1;
-				if(newSize < 128) {
-					newSize = 128;
-				}
-				let newArray = new Float32Array(newSize);
-				newArray.set(this4.array);
-				this4.array = newArray;
-			}
-			this4.array[this4.pos++] = v;
-			let this5 = _this.tmp;
-			if(this5.pos == this5.array.length) {
-				let newSize = this5.array.length << 1;
-				if(newSize < 128) {
-					newSize = 128;
-				}
-				let newArray = new Float32Array(newSize);
-				newArray.set(this5.array);
-				this5.array = newArray;
-			}
-			this5.array[this5.pos++] = r;
-			let this6 = _this.tmp;
-			if(this6.pos == this6.array.length) {
-				let newSize = this6.array.length << 1;
-				if(newSize < 128) {
-					newSize = 128;
-				}
-				let newArray = new Float32Array(newSize);
-				newArray.set(this6.array);
-				this6.array = newArray;
-			}
-			this6.array[this6.pos++] = g;
-			let this7 = _this.tmp;
-			if(this7.pos == this7.array.length) {
-				let newSize = this7.array.length << 1;
-				if(newSize < 128) {
-					newSize = 128;
-				}
-				let newArray = new Float32Array(newSize);
-				newArray.set(this7.array);
-				this7.array = newArray;
-			}
-			this7.array[this7.pos++] = b;
-			let this8 = _this.tmp;
-			if(this8.pos == this8.array.length) {
-				let newSize = this8.array.length << 1;
-				if(newSize < 128) {
-					newSize = 128;
-				}
-				let newArray = new Float32Array(newSize);
-				newArray.set(this8.array);
-				this8.array = newArray;
-			}
-			this8.array[this8.pos++] = a;
-			_this.bufferDirty = true;
+			this.content.add(x,y,u,v,r,g,b,a);
 		}
 		let gp = new h2d_GPoint();
 		gp.load(x,y,this.lineR,this.lineG,this.lineB,this.lineA);
 		this.tmpPoints.push(gp);
 	}
 	draw(ctx) {
-		if(!ctx.beginDrawObject(this,this.tile.innerTex)) {
+		if(!ctx.beginDrawObject(this,this.tile.getTexture())) {
 			return;
 		}
 		this.content.render(ctx.engine);
@@ -3347,27 +2383,20 @@ class h2d_Graphics extends h2d_Drawable {
 	sync(ctx) {
 		super.sync(ctx);
 		this.flush();
-		let _this = this.content;
-		if(_this.buffer == null || _this.buffer.isDisposed()) {
-			_this.alloc(h3d_Engine.CURRENT);
-		} else {
-			if(_this.bufferDirty) {
-				_this.buffer.dispose();
-				_this.buffer = h3d_Buffer.ofFloats(_this.tmp,8,[h3d_BufferFlag.RawFormat]);
-				_this.bufferDirty = false;
-			}
-			if(_this.indexDirty) {
-				_this.indexes.dispose();
-				_this.indexes = h3d_Indexes.alloc(_this.index);
-				_this.indexDirty = false;
-			}
-		}
+		this.content.flush();
 	}
 }
 h2d_Graphics.__name__ = "h2d.Graphics";
 h2d_Graphics.__super__ = h2d_Drawable;
 Object.assign(h2d_Graphics.prototype, {
 	__class__: h2d_Graphics
+});
+class hxd_Interactive {
+}
+hxd_Interactive.__name__ = "hxd.Interactive";
+hxd_Interactive.__isInterface__ = true;
+Object.assign(hxd_Interactive.prototype, {
+	__class__: hxd_Interactive
 });
 class h2d_Interactive extends h2d_Drawable {
 	constructor(width,height,parent,shape) {
@@ -3398,13 +2427,13 @@ class h2d_Interactive extends h2d_Drawable {
 	}
 	draw(ctx) {
 		if(this.backgroundColor != null) {
-			this.emitTile(ctx,h2d_Tile.fromColor(this.backgroundColor,this.width | 0,this.height | 0,(this.backgroundColor >>> 24) / 255));
+			this.emitTile(ctx,h2d_Tile.fromColor(this.backgroundColor,Std.int(this.width),Std.int(this.height),(this.backgroundColor >>> 24) / 255));
 		}
 	}
 	getBoundsRec(relativeTo,out,forSize) {
 		super.getBoundsRec(relativeTo,out,forSize);
 		if(this.backgroundColor != null || forSize) {
-			this.addBounds(relativeTo,out,0,0,this.width | 0,this.height | 0);
+			this.addBounds(relativeTo,out,0,0,Std.int(this.width),Std.int(this.height));
 		}
 	}
 	onHierarchyMoved(parentChanged) {
@@ -3421,7 +2450,7 @@ class h2d_Interactive extends h2d_Drawable {
 		this.parentMask = null;
 		let p = this.parent;
 		while(p != null) {
-			let m = ((p) instanceof h2d_Mask) ? p : null;
+			let m = hxd_impl_Api.downcast(p,h2d_Mask);
 			if(m != null) {
 				this.parentMask = m;
 				break;
@@ -3579,6 +2608,7 @@ class h2d_Interactive extends h2d_Drawable {
 	}
 }
 h2d_Interactive.__name__ = "h2d.Interactive";
+h2d_Interactive.__interfaces__ = [hxd_Interactive];
 h2d_Interactive.__super__ = h2d_Drawable;
 Object.assign(h2d_Interactive.prototype, {
 	__class__: h2d_Interactive
@@ -3628,9 +2658,7 @@ class h2d_Layers extends h2d_Object {
 					this.layersIndexes[k]--;
 					--k;
 				}
-				if(this.parentContainer != null) {
-					this.parentContainer.contentChanged(this);
-				}
+				this.onContentChanged();
 				break;
 			}
 		}
@@ -3669,7 +2697,7 @@ class h2d_Mask extends h2d_Object {
 		this.parentMask = null;
 		let p = this.parent;
 		while(p != null) {
-			let m = ((p) instanceof h2d_Mask) ? p : null;
+			let m = hxd_impl_Api.downcast(p,h2d_Mask);
 			if(m != null) {
 				this.parentMask = m;
 				break;
@@ -3687,10 +2715,7 @@ class h2d_Mask extends h2d_Object {
 		let yMin = out.yMin;
 		let xMax = out.xMax;
 		let yMax = out.yMax;
-		out.xMin = 1e20;
-		out.yMin = 1e20;
-		out.xMax = -1e20;
-		out.yMax = -1e20;
+		out.empty();
 		if(this.posChanged) {
 			this.calcAbsPos();
 			let _g = 0;
@@ -3713,16 +2738,16 @@ class h2d_Mask extends h2d_Object {
 		out.yMax = yMax;
 		super.getBoundsRec(relativeTo,out,forSize);
 		if(out.xMin < bxMin) {
-			out.xMin = xMin > bxMin ? bxMin : xMin;
+			out.xMin = hxd_Math.min(xMin,bxMin);
 		}
 		if(out.yMin < byMin) {
-			out.yMin = yMin > byMin ? byMin : yMin;
+			out.yMin = hxd_Math.min(yMin,byMin);
 		}
 		if(out.xMax > bxMax) {
-			out.xMax = xMax < bxMax ? bxMax : xMax;
+			out.xMax = hxd_Math.max(xMax,bxMax);
 		}
 		if(out.yMax > byMax) {
-			out.yMax = yMax < byMax ? byMax : yMax;
+			out.yMax = hxd_Math.max(yMax,byMax);
 		}
 	}
 	drawRec(ctx) {
@@ -3741,6 +2766,7 @@ class h2d_Mask extends h2d_Object {
 			y1 = y2;
 			y2 = tmp;
 		}
+		ctx.flush();
 		if(ctx.hasRenderZone) {
 			let oldX = ctx.renderX;
 			let oldY = ctx.renderY;
@@ -3748,12 +2774,13 @@ class h2d_Mask extends h2d_Object {
 			let oldH = ctx.renderH;
 			ctx.setRenderZone(x1,y1,x2 - x1,y2 - y1);
 			super.drawRec(ctx);
+			ctx.flush();
 			ctx.setRenderZone(oldX,oldY,oldW,oldH);
 		} else {
 			ctx.setRenderZone(x1,y1,x2 - x1,y2 - y1);
 			super.drawRec(ctx);
-			ctx.hasRenderZone = false;
-			ctx.engine.setRenderZone();
+			ctx.flush();
+			ctx.clearRenderZone();
 		}
 	}
 }
@@ -3770,7 +2797,7 @@ class h3d_impl_RenderContext {
 		this._hx_constructor();
 	}
 	_hx_constructor() {
-		this.engine = h3d_Engine.CURRENT;
+		this.engine = h3d_Engine.getCurrent();
 		this.frame = 0;
 		this.time = 0.;
 		this.elapsedTime = 1. / hxd_System.getDefaultFrameRate();
@@ -3801,11 +2828,14 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 		this.pass.set_culling(h3d_mat_Face.None);
 		this.baseShader = new h3d_shader_Base2d();
 		this.baseShader.setPriority(100);
-		this.baseShader.zValue__ = 0.;
+		this.baseShader.set_zValue(0.);
 		this.baseShaderList = new hxsl_ShaderList(this.baseShader);
 		this.targetsStack = [];
 		this.targetsStackIndex = 0;
 		this.filterStack = [];
+	}
+	hasBuffering() {
+		return false;
 	}
 	begin() {
 		this.texture = null;
@@ -3820,53 +2850,11 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 		this.curWidth = this.scene.width;
 		this.curHeight = this.scene.height;
 		this.manager.globals.set("time",this.time);
-		let _this = this.baseShader;
-		_this.constModified = true;
-		_this.pixelAlign__ = false;
-		let _this1 = this.baseShader.halfPixelInverse__;
-		let x = 0.5 / this.engine.width;
-		let y = 0.5 / this.engine.height;
-		if(y == null) {
-			y = 0.;
-		}
-		if(x == null) {
-			x = 0.;
-		}
-		_this1.x = x;
-		_this1.y = y;
-		_this1.z = 0.;
-		_this1.w = 1.;
-		let _this2 = this.baseShader.viewport__;
-		let x1 = -this.scene.width * 0.5 - this.scene.offsetX;
-		let y1 = -this.scene.height * 0.5 - this.scene.offsetY;
-		let z = 2 / this.scene.width * this.scene.ratioX;
-		let w = -2 * this.baseFlipY / this.scene.height * this.scene.ratioY;
-		if(w == null) {
-			w = 1.;
-		}
-		if(z == null) {
-			z = 0.;
-		}
-		if(y1 == null) {
-			y1 = 0.;
-		}
-		if(x1 == null) {
-			x1 = 0.;
-		}
-		_this2.x = x1;
-		_this2.y = y1;
-		_this2.z = z;
-		_this2.w = w;
-		let _this3 = this.baseShader.filterMatrixA__;
-		_this3.x = 1;
-		_this3.y = 0;
-		_this3.z = 0;
-		_this3.w = 1.;
-		let _this4 = this.baseShader.filterMatrixB__;
-		_this4.x = 0;
-		_this4.y = 1;
-		_this4.z = 0;
-		_this4.w = 1.;
+		this.baseShader.set_pixelAlign(false);
+		this.baseShader.get_halfPixelInverse().set(0.5 / this.engine.width,0.5 / this.engine.height);
+		this.baseShader.get_viewport().set(-this.scene.width * 0.5 - this.scene.offsetX,-this.scene.height * 0.5 - this.scene.offsetY,2 / this.scene.width * this.scene.ratioX,-2 * this.baseFlipY / this.scene.height * this.scene.ratioY);
+		this.baseShader.get_filterMatrixA().set(1,0,0);
+		this.baseShader.get_filterMatrixB().set(0,1,0);
 		this.baseShaderList.next = null;
 		this.initShaders(this.baseShaderList);
 		this.engine.selectMaterial(this.pass);
@@ -3878,16 +2866,14 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 		if(this.buffers == null) {
 			this.buffers = new h3d_shader_Buffers(this.compiledShader);
 		} else {
-			let _this = this.buffers;
-			let s = this.compiledShader;
-			_this.vertex.grow(s.vertex);
-			_this.fragment.grow(s.fragment);
+			this.buffers.grow(this.compiledShader);
 		}
 		this.manager.fillGlobals(this.buffers,this.compiledShader);
 		this.engine.selectShader(this.compiledShader);
 		this.engine.uploadShaderBuffers(this.buffers,0);
 	}
 	end() {
+		this.flush();
 		this.texture = null;
 		this.currentObj = null;
 		this.baseShaderList.next = null;
@@ -3929,6 +2915,7 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 		if(startX == null) {
 			startX = 0;
 		}
+		this.flush();
 		this.engine.pushTarget(t);
 		this.initShaders(this.baseShaderList);
 		if(width < 0) {
@@ -3937,40 +2924,8 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 		if(height < 0) {
 			height = t == null ? this.scene.height : t.height;
 		}
-		let _this = this.baseShader.halfPixelInverse__;
-		let x = 0.5 / (t == null ? this.engine.width : t.width);
-		let y = 0.5 / (t == null ? this.engine.height : t.height);
-		if(y == null) {
-			y = 0.;
-		}
-		if(x == null) {
-			x = 0.;
-		}
-		_this.x = x;
-		_this.y = y;
-		_this.z = 0.;
-		_this.w = 1.;
-		let _this1 = this.baseShader.viewport__;
-		let x1 = -width * 0.5 - startX;
-		let y1 = -height * 0.5 - startY;
-		let z = 2 / width;
-		let w = -2 * this.targetFlipY / height;
-		if(w == null) {
-			w = 1.;
-		}
-		if(z == null) {
-			z = 0.;
-		}
-		if(y1 == null) {
-			y1 = 0.;
-		}
-		if(x1 == null) {
-			x1 = 0.;
-		}
-		_this1.x = x1;
-		_this1.y = y1;
-		_this1.z = z;
-		_this1.w = w;
+		this.baseShader.get_halfPixelInverse().set(0.5 / (t == null ? this.engine.width : t.width),0.5 / (t == null ? this.engine.height : t.height));
+		this.baseShader.get_viewport().set(-width * 0.5 - startX,-height * 0.5 - startY,2 / width,-2 * this.targetFlipY / height);
 		this.targetsStackIndex++;
 		if(this.targetsStackIndex > this.targetsStack.length) {
 			this.targetsStack.push({ t : t, x : startX, y : startY, w : width, h : height, hasRZ : this.hasRenderZone, rzX : this.renderX, rzY : this.renderY, rzW : this.renderW, rzH : this.renderH});
@@ -3993,14 +2948,14 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 		this.curHeight = height;
 		this.currentBlend = null;
 		if(this.hasRenderZone) {
-			this.hasRenderZone = false;
-			this.engine.setRenderZone();
+			this.clearRenderZone();
 		}
 	}
 	popTarget(restore) {
 		if(restore == null) {
 			restore = true;
 		}
+		this.flush();
 		if(this.targetsStackIndex <= 0) {
 			throw haxe_Exception.thrown("Too many popTarget()");
 		}
@@ -4039,40 +2994,8 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 				offsetY = 0;
 			}
 			this.initShaders(this.baseShaderList);
-			let _this = this.baseShader.halfPixelInverse__;
-			let x = 0.5 / (t == null ? this.engine.width : t.width);
-			let y = 0.5 / (t == null ? this.engine.height : t.height);
-			if(y == null) {
-				y = 0.;
-			}
-			if(x == null) {
-				x = 0.;
-			}
-			_this.x = x;
-			_this.y = y;
-			_this.z = 0.;
-			_this.w = 1.;
-			let _this1 = this.baseShader.viewport__;
-			let x1 = -width * 0.5 - startX - offsetX;
-			let y1 = -height * 0.5 - startY - offsetY;
-			let z = 2 / width * ratioX;
-			let w = -2 * (t == null ? this.baseFlipY : this.targetFlipY) / height * ratioY;
-			if(w == null) {
-				w = 1.;
-			}
-			if(z == null) {
-				z = 0.;
-			}
-			if(y1 == null) {
-				y1 = 0.;
-			}
-			if(x1 == null) {
-				x1 = 0.;
-			}
-			_this1.x = x1;
-			_this1.y = y1;
-			_this1.z = z;
-			_this1.w = w;
+			this.baseShader.get_halfPixelInverse().set(0.5 / (t == null ? this.engine.width : t.width),0.5 / (t == null ? this.engine.height : t.height));
+			this.baseShader.get_viewport().set(-width * 0.5 - startX - offsetX,-height * 0.5 - startY - offsetY,2 / width * ratioX,-2 * (t == null ? this.baseFlipY : this.targetFlipY) / height * ratioY);
 			this.curX = startX;
 			this.curY = startY;
 			this.curWidth = width;
@@ -4091,8 +3014,8 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 		let scaleX = this.engine.width * this.scene.ratioX / this.scene.width;
 		let scaleY = this.engine.height * this.scene.ratioY / this.scene.height;
 		if(this.inFilter != null) {
-			let fa = this.baseShader.filterMatrixA__;
-			let fb = this.baseShader.filterMatrixB__;
+			let fa = this.baseShader.get_filterMatrixA();
+			let fb = this.baseShader.get_filterMatrixB();
 			let x2 = x + w;
 			let y2 = y + h;
 			let rx1 = x * fa.x + y * fa.y + fa.z;
@@ -4104,16 +3027,38 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 			w = rx2 - rx1;
 			h = ry2 - ry1;
 		}
-		this.engine.setRenderZone((x - this.curX + this.scene.viewportX) * scaleX + 1e-10 | 0,(y - this.curY + this.scene.viewportY) * scaleY + 1e-10 | 0,w * scaleX + 1e-10 | 0,h * scaleY + 1e-10 | 0);
+		this.engine.setRenderZone(Std.int((x - this.curX + this.scene.viewportX) * scaleX + 1e-10),Std.int((y - this.curY + this.scene.viewportY) * scaleY + 1e-10),Std.int(w * scaleX + 1e-10),Std.int(h * scaleY + 1e-10));
+	}
+	clearRenderZone() {
+		this.hasRenderZone = false;
+		this.engine.setRenderZone();
 	}
 	drawScene() {
 		this.scene.drawRec(this);
+	}
+	flush() {
+		if(this.hasBuffering()) {
+			this._flush();
+		}
+	}
+	_flush() {
+		if(this.bufPos == 0) {
+			return;
+		}
+		this.beforeDraw();
+		let nverts = Std.int(this.bufPos / this.stride);
+		let tmp = new h3d_Buffer(nverts,this.stride,[h3d_BufferFlag.Quads,h3d_BufferFlag.Dynamic,h3d_BufferFlag.RawFormat]);
+		tmp.uploadVector(this.buffer,0,nverts);
+		this.engine.renderQuadBuffer(tmp);
+		tmp.dispose();
+		this.bufPos = 0;
+		this.texture = null;
 	}
 	beforeDraw() {
 		if(this.texture == null) {
 			this.texture = h3d_mat_Texture.fromColor(16711935);
 		}
-		this.baseShader.texture__ = this.texture;
+		this.baseShader.set_texture(this.texture);
 		this.texture.set_filter((this.currentObj.smooth == null ? this.defaultSmooth : this.currentObj.smooth) ? h3d_mat_Filter.Linear : h3d_mat_Filter.Nearest);
 		this.texture.set_wrap(this.currentObj.tileWrap && (this.currentObj.filter == null || this.inFilter != null) ? h3d_mat_Wrap.Repeat : h3d_mat_Wrap.Clamp);
 		let blend = this.currentObj.blendMode;
@@ -4139,113 +3084,27 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 		this.engine.uploadShaderBuffers(this.buffers,2);
 		this.engine.uploadShaderBuffers(this.buffers,3);
 	}
+	setupColor(obj) {
+		if(this.inFilter == obj) {
+			this.baseShader.get_color().set(obj.color.get_r(),obj.color.get_g(),obj.color.get_b(),obj.color.get_a());
+		} else if(this.inFilterBlend != null) {
+			this.baseShader.get_color().set(this.globalAlpha,this.globalAlpha,this.globalAlpha,this.globalAlpha);
+		} else {
+			this.baseShader.get_color().set(obj.color.get_r(),obj.color.get_g(),obj.color.get_b(),obj.color.get_a() * this.globalAlpha);
+		}
+	}
 	beginDrawObject(obj,texture) {
 		if(!this.beginDraw(obj,texture,true)) {
 			return false;
 		}
-		if(this.inFilter == obj) {
-			let _this = this.baseShader.color__;
-			let x = obj.color.x;
-			let y = obj.color.y;
-			let z = obj.color.z;
-			let w = obj.color.w;
-			if(w == null) {
-				w = 1.;
-			}
-			if(z == null) {
-				z = 0.;
-			}
-			if(y == null) {
-				y = 0.;
-			}
-			if(x == null) {
-				x = 0.;
-			}
-			_this.x = x;
-			_this.y = y;
-			_this.z = z;
-			_this.w = w;
-		} else if(this.inFilterBlend != null) {
-			let _this = this.baseShader.color__;
-			let x = this.globalAlpha;
-			let y = this.globalAlpha;
-			let z = this.globalAlpha;
-			let w = this.globalAlpha;
-			if(w == null) {
-				w = 1.;
-			}
-			if(z == null) {
-				z = 0.;
-			}
-			if(y == null) {
-				y = 0.;
-			}
-			if(x == null) {
-				x = 0.;
-			}
-			_this.x = x;
-			_this.y = y;
-			_this.z = z;
-			_this.w = w;
-		} else {
-			let _this = this.baseShader.color__;
-			let x = obj.color.x;
-			let y = obj.color.y;
-			let z = obj.color.z;
-			let w = obj.color.w * this.globalAlpha;
-			if(w == null) {
-				w = 1.;
-			}
-			if(z == null) {
-				z = 0.;
-			}
-			if(y == null) {
-				y = 0.;
-			}
-			if(x == null) {
-				x = 0.;
-			}
-			_this.x = x;
-			_this.y = y;
-			_this.z = z;
-			_this.w = w;
-		}
-		let _this = this.baseShader.absoluteMatrixA__;
-		let x = obj.matA;
-		let y = obj.matC;
-		let z = obj.absX;
-		if(z == null) {
-			z = 0.;
-		}
-		if(y == null) {
-			y = 0.;
-		}
-		if(x == null) {
-			x = 0.;
-		}
-		_this.x = x;
-		_this.y = y;
-		_this.z = z;
-		_this.w = 1.;
-		let _this1 = this.baseShader.absoluteMatrixB__;
-		let x1 = obj.matB;
-		let y1 = obj.matD;
-		let z1 = obj.absY;
-		if(z1 == null) {
-			z1 = 0.;
-		}
-		if(y1 == null) {
-			y1 = 0.;
-		}
-		if(x1 == null) {
-			x1 = 0.;
-		}
-		_this1.x = x1;
-		_this1.y = y1;
-		_this1.z = z1;
-		_this1.w = 1.;
+		this.setupColor(obj);
+		this.baseShader.get_absoluteMatrixA().set(obj.matA,obj.matC,obj.absX);
+		this.baseShader.get_absoluteMatrixB().set(obj.matB,obj.matD,obj.absY);
 		this.beforeDraw();
 		return true;
+	}
+	beginDrawBatch(obj,texture) {
+		return this.beginDraw(obj,texture,false);
 	}
 	drawTile(obj,tile) {
 		let matA;
@@ -4255,8 +3114,8 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 		let absX;
 		let absY;
 		if(this.inFilter != null) {
-			let f1 = this.baseShader.filterMatrixA__;
-			let f2 = this.baseShader.filterMatrixB__;
+			let f1 = this.baseShader.get_filterMatrixA();
+			let f2 = this.baseShader.get_filterMatrixB();
 			matA = obj.matA * f1.x + obj.matB * f1.y;
 			matB = obj.matA * f2.x + obj.matB * f2.y;
 			matC = obj.matC * f1.x + obj.matD * f1.y;
@@ -4274,11 +3133,7 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 		if(matB == 0 && matC == 0) {
 			let tx = tile.dx + tile.width * 0.5;
 			let ty = tile.dy + tile.height * 0.5;
-			let f = obj.matA;
-			let a = f < 0 ? -f : f;
-			let f1 = obj.matD;
-			let b = f1 < 0 ? -f1 : f1;
-			let tr = (tile.width > tile.height ? tile.width : tile.height) * 1.5 * (a < b ? b : a);
+			let tr = (tile.width > tile.height ? tile.width : tile.height) * 1.5 * hxd_Math.max(hxd_Math.abs(obj.matA),hxd_Math.abs(obj.matD));
 			let cx = absX + tx * matA - this.curX;
 			let cy = absY + ty * matD - this.curY;
 			if(cx < -tr || cy < -tr || cx - tr > this.curWidth || cy - tr > this.curHeight) {
@@ -4355,131 +3210,13 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 				return false;
 			}
 		}
-		if(!this.beginDraw(obj,tile.innerTex,true,true)) {
+		if(!this.beginDraw(obj,tile.getTexture(),true,true)) {
 			return false;
 		}
-		if(this.inFilter == obj) {
-			let _this = this.baseShader.color__;
-			let x = obj.color.x;
-			let y = obj.color.y;
-			let z = obj.color.z;
-			let w = obj.color.w;
-			if(w == null) {
-				w = 1.;
-			}
-			if(z == null) {
-				z = 0.;
-			}
-			if(y == null) {
-				y = 0.;
-			}
-			if(x == null) {
-				x = 0.;
-			}
-			_this.x = x;
-			_this.y = y;
-			_this.z = z;
-			_this.w = w;
-		} else if(this.inFilterBlend != null) {
-			let _this = this.baseShader.color__;
-			let x = this.globalAlpha;
-			let y = this.globalAlpha;
-			let z = this.globalAlpha;
-			let w = this.globalAlpha;
-			if(w == null) {
-				w = 1.;
-			}
-			if(z == null) {
-				z = 0.;
-			}
-			if(y == null) {
-				y = 0.;
-			}
-			if(x == null) {
-				x = 0.;
-			}
-			_this.x = x;
-			_this.y = y;
-			_this.z = z;
-			_this.w = w;
-		} else {
-			let _this = this.baseShader.color__;
-			let x = obj.color.x;
-			let y = obj.color.y;
-			let z = obj.color.z;
-			let w = obj.color.w * this.globalAlpha;
-			if(w == null) {
-				w = 1.;
-			}
-			if(z == null) {
-				z = 0.;
-			}
-			if(y == null) {
-				y = 0.;
-			}
-			if(x == null) {
-				x = 0.;
-			}
-			_this.x = x;
-			_this.y = y;
-			_this.z = z;
-			_this.w = w;
-		}
-		let _this = this.baseShader.absoluteMatrixA__;
-		let x = tile.width * obj.matA;
-		let y = tile.height * obj.matC;
-		let z = obj.absX + tile.dx * obj.matA + tile.dy * obj.matC;
-		if(z == null) {
-			z = 0.;
-		}
-		if(y == null) {
-			y = 0.;
-		}
-		if(x == null) {
-			x = 0.;
-		}
-		_this.x = x;
-		_this.y = y;
-		_this.z = z;
-		_this.w = 1.;
-		let _this1 = this.baseShader.absoluteMatrixB__;
-		let x1 = tile.width * obj.matB;
-		let y1 = tile.height * obj.matD;
-		let z1 = obj.absY + tile.dx * obj.matB + tile.dy * obj.matD;
-		if(z1 == null) {
-			z1 = 0.;
-		}
-		if(y1 == null) {
-			y1 = 0.;
-		}
-		if(x1 == null) {
-			x1 = 0.;
-		}
-		_this1.x = x1;
-		_this1.y = y1;
-		_this1.z = z1;
-		_this1.w = 1.;
-		let _this2 = this.baseShader.uvPos__;
-		let x2 = tile.u;
-		let y2 = tile.v;
-		let z2 = tile.u2 - tile.u;
-		let w = tile.v2 - tile.v;
-		if(w == null) {
-			w = 1.;
-		}
-		if(z2 == null) {
-			z2 = 0.;
-		}
-		if(y2 == null) {
-			y2 = 0.;
-		}
-		if(x2 == null) {
-			x2 = 0.;
-		}
-		_this2.x = x2;
-		_this2.y = y2;
-		_this2.z = z2;
-		_this2.w = w;
+		this.setupColor(obj);
+		this.baseShader.get_absoluteMatrixA().set(tile.width * obj.matA,tile.height * obj.matC,obj.absX + tile.dx * obj.matA + tile.dy * obj.matC);
+		this.baseShader.get_absoluteMatrixB().set(tile.width * obj.matB,tile.height * obj.matD,obj.absY + tile.dx * obj.matB + tile.dy * obj.matD);
+		this.baseShader.get_uvPos().set(tile.u,tile.v,tile.u2 - tile.u,tile.v2 - tile.v);
 		this.beforeDraw();
 		if(this.fixedBuffer == null || this.fixedBuffer.isDisposed()) {
 			this.fixedBuffer = new h3d_Buffer(4,8,[h3d_BufferFlag.Quads,h3d_BufferFlag.RawFormat]);
@@ -4807,8 +3544,7 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 			k.array[k.pos++] = 1;
 			this.fixedBuffer.uploadVector(k,0,4);
 		}
-		let _this3 = this.engine;
-		_this3.renderBuffer(this.fixedBuffer,_this3.mem.quadIndexes,2,0,-1);
+		this.engine.renderQuadBuffer(this.fixedBuffer);
 		return true;
 	}
 	beginDraw(obj,texture,isRelative,hasUVPos) {
@@ -4817,6 +3553,9 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 		}
 		if(this.onBeginDraw != null && !this.onBeginDraw(obj)) {
 			return false;
+		}
+		if(this.hasBuffering() && this.currentObj != null && (texture != this.texture || 8 != this.stride || obj.blendMode != this.currentObj.blendMode || obj.filter != this.currentObj.filter)) {
+			this.flush();
 		}
 		let shaderChanged = false;
 		let paramsChanged = false;
@@ -4836,23 +3575,19 @@ class h2d_RenderContext extends h3d_impl_RenderContext {
 				shaderChanged = true;
 			}
 		}
-		if(objShaders != null || curShaders != null || this.baseShader.isRelative__ != isRelative || this.baseShader.hasUVPos__ != hasUVPos || this.baseShader.killAlpha__ != this.killAlpha) {
+		if(objShaders != null || curShaders != null || this.baseShader.get_isRelative() != isRelative || this.baseShader.get_hasUVPos() != hasUVPos || this.baseShader.get_killAlpha() != this.killAlpha) {
 			shaderChanged = true;
 		}
 		if(shaderChanged) {
-			let _this = this.baseShader;
-			_this.constModified = true;
-			_this.hasUVPos__ = hasUVPos;
-			let _this1 = this.baseShader;
-			_this1.constModified = true;
-			_this1.isRelative__ = isRelative;
-			let _this2 = this.baseShader;
-			_this2.constModified = true;
-			_this2.killAlpha__ = this.killAlpha;
+			this.flush();
+			this.baseShader.set_hasUVPos(hasUVPos);
+			this.baseShader.set_isRelative(isRelative);
+			this.baseShader.set_killAlpha(this.killAlpha);
 			this.baseShader.updateConstants(this.manager.globals);
 			this.baseShaderList.next = obj.shaders;
 			this.initShaders(this.baseShaderList);
 		} else if(paramsChanged) {
+			this.flush();
 			if(this.currentShaders != this.baseShaderList) {
 				throw haxe_Exception.thrown("!");
 			}
@@ -4886,6 +3621,13 @@ var h2d_ScaleMode = $hxEnums["h2d.ScaleMode"] = { __ename__ : true, __constructs
 	,AutoZoom: ($_=function(minWidth,minHeight,integerScaling) { return {_hx_index:5,minWidth:minWidth,minHeight:minHeight,integerScaling:integerScaling,__enum__:"h2d.ScaleMode",toString:$estr}; },$_.__params__ = ["minWidth","minHeight","integerScaling"],$_)
 };
 h2d_ScaleMode.__empty_constructs__ = [h2d_ScaleMode.Resize];
+class hxd_InteractiveScene {
+}
+hxd_InteractiveScene.__name__ = "hxd.InteractiveScene";
+hxd_InteractiveScene.__isInterface__ = true;
+Object.assign(hxd_InteractiveScene.prototype, {
+	__class__: hxd_InteractiveScene
+});
 class h2d_Scene extends h2d_Layers {
 	constructor() {
 		h2d_Object._hx_skip_constructor = true;
@@ -4896,7 +3638,7 @@ class h2d_Scene extends h2d_Layers {
 	_hx_constructor() {
 		this.scaleMode = h2d_ScaleMode.Resize;
 		super._hx_constructor(null);
-		let e = h3d_Engine.CURRENT;
+		let e = h3d_Engine.getCurrent();
 		this.ctx = new h2d_RenderContext(this);
 		this.width = e.width;
 		this.height = e.height;
@@ -4916,7 +3658,7 @@ class h2d_Scene extends h2d_Layers {
 		this.events = events;
 	}
 	checkResize() {
-		let engine = h3d_Engine.CURRENT;
+		let engine = h3d_Engine.getCurrent();
 		let _g = this.scaleMode;
 		switch(_g._hx_index) {
 		case 0:
@@ -4959,11 +3701,9 @@ class h2d_Scene extends h2d_Layers {
 				this.height = _g5;
 				this.posChanged = true;
 			}
-			let a = engine.width / _g6;
-			let b = engine.height / _g5;
-			let zoom = a > b ? b : a;
+			let zoom = hxd_Math.min(engine.width / _g6,engine.height / _g5);
 			if(_g.integerScale) {
-				zoom = zoom | 0;
+				zoom = Std.int(zoom);
 				if(zoom == 0) {
 					zoom = 1;
 				}
@@ -5055,8 +3795,8 @@ class h2d_Scene extends h2d_Layers {
 			break;
 		case 4:
 			let _g12 = _g.level;
-			let w1 = Math.ceil(engine.width / _g12);
-			let h1 = Math.ceil(engine.height / _g12);
+			let w1 = hxd_Math.ceil(engine.width / _g12);
+			let h1 = hxd_Math.ceil(engine.height / _g12);
 			if(w1 != this.width || h1 != this.height) {
 				this.width = w1;
 				this.height = h1;
@@ -5070,17 +3810,15 @@ class h2d_Scene extends h2d_Layers {
 			this.viewportY = 0;
 			break;
 		case 5:
-			let a1 = engine.width / _g.minWidth;
-			let b1 = engine.height / _g.minHeight;
-			let zoom1 = a1 > b1 ? b1 : a1;
+			let zoom1 = hxd_Math.min(engine.width / _g.minWidth,engine.height / _g.minHeight);
 			if(_g.integerScaling) {
-				zoom1 = zoom1 | 0;
+				zoom1 = Std.int(zoom1);
 				if(zoom1 == 0) {
 					zoom1 = 1;
 				}
 			}
-			let w2 = Math.ceil(engine.width / zoom1);
-			let h2 = Math.ceil(engine.height / zoom1);
+			let w2 = hxd_Math.ceil(engine.width / zoom1);
+			let h2 = hxd_Math.ceil(engine.height / zoom1);
 			if(w2 != this.width || h2 != this.height) {
 				this.width = w2;
 				this.height = h2;
@@ -5094,6 +3832,12 @@ class h2d_Scene extends h2d_Layers {
 			this.viewportY = 0;
 			break;
 		}
+	}
+	screenXToLocal(mx) {
+		return mx * this.width / (this.window.get_width() * this.ratioX * this.scaleX) - this.x - this.viewportX;
+	}
+	screenYToLocal(my) {
+		return my * this.height / (this.window.get_height() * this.ratioY * this.scaleY) - this.y - this.viewportY;
 	}
 	dispatchListeners(event) {
 		this.screenToLocal(event);
@@ -5119,8 +3863,8 @@ class h2d_Scene extends h2d_Layers {
 		return true;
 	}
 	screenToLocal(e) {
-		let x = e.relX * this.width / (this.window.get_width() * this.ratioX * this.scaleX) - this.x - this.viewportX;
-		let y = e.relY * this.height / (this.window.get_height() * this.ratioY * this.scaleY) - this.y - this.viewportY;
+		let x = this.screenXToLocal(e.relX);
+		let y = this.screenYToLocal(e.relY);
 		let rx = x * this.matA + y * this.matB + this.absX;
 		let ry = x * this.matC + y * this.matD + this.absY;
 		e.relX = rx;
@@ -5161,8 +3905,7 @@ class h2d_Scene extends h2d_Layers {
 			let dx = rx - i.absX;
 			let dy = ry - i.absY;
 			if(i.shape != null) {
-				pt.x = (dx * i.matD - dy * i.matC) * i.invDet + i.shapeX;
-				pt.y = (-dx * i.matB + dy * i.matA) * i.invDet + i.shapeY;
+				pt.set((dx * i.matD - dy * i.matC) * i.invDet + i.shapeX,(-dx * i.matB + dy * i.matA) * i.invDet + i.shapeY);
 				if(!i.shape.contains(pt)) {
 					continue;
 				}
@@ -5322,6 +4065,7 @@ class h2d_Scene extends h2d_Layers {
 	}
 }
 h2d_Scene.__name__ = "h2d.Scene";
+h2d_Scene.__interfaces__ = [hxd_InteractiveScene,h3d_IDrawable];
 h2d_Scene.__super__ = h2d_Layers;
 Object.assign(h2d_Scene.prototype, {
 	__class__: h2d_Scene
@@ -5344,6 +4088,9 @@ class h2d_Tile {
 		if(tex != null) {
 			this.setTexture(tex);
 		}
+	}
+	getTexture() {
+		return this.innerTex;
 	}
 	setTexture(tex) {
 		this.innerTex = tex;
@@ -5379,6 +4126,50 @@ Object.assign(h2d_Tile.prototype, {
 });
 class h2d_col_Bounds {
 	constructor() {
+		this.empty();
+	}
+	addBounds(b) {
+		if(b.xMin < this.xMin) {
+			this.xMin = b.xMin;
+		}
+		if(b.xMax > this.xMax) {
+			this.xMax = b.xMax;
+		}
+		if(b.yMin < this.yMin) {
+			this.yMin = b.yMin;
+		}
+		if(b.yMax > this.yMax) {
+			this.yMax = b.yMax;
+		}
+	}
+	addPos(x,y) {
+		if(x < this.xMin) {
+			this.xMin = x;
+		}
+		if(x > this.xMax) {
+			this.xMax = x;
+		}
+		if(y < this.yMin) {
+			this.yMin = y;
+		}
+		if(y > this.yMax) {
+			this.yMax = y;
+		}
+	}
+	doIntersect(b) {
+		this.xMin = hxd_Math.max(this.xMin,b.xMin);
+		this.yMin = hxd_Math.max(this.yMin,b.yMin);
+		this.xMax = hxd_Math.min(this.xMax,b.xMax);
+		this.yMax = hxd_Math.min(this.yMax,b.yMax);
+	}
+	isEmpty() {
+		if(!(this.xMax <= this.xMin)) {
+			return this.yMax <= this.yMin;
+		} else {
+			return true;
+		}
+	}
+	empty() {
 		this.xMin = 1e20;
 		this.yMin = 1e20;
 		this.xMax = -1e20;
@@ -5389,6 +4180,13 @@ h2d_col_Bounds.__name__ = "h2d.col.Bounds";
 Object.assign(h2d_col_Bounds.prototype, {
 	__class__: h2d_col_Bounds
 });
+class h2d_col_Collider {
+}
+h2d_col_Collider.__name__ = "h2d.col.Collider";
+h2d_col_Collider.__isInterface__ = true;
+Object.assign(h2d_col_Collider.prototype, {
+	__class__: h2d_col_Collider
+});
 class h2d_col_Point {
 	constructor(x,y) {
 		if(y == null) {
@@ -5397,6 +4195,10 @@ class h2d_col_Point {
 		if(x == null) {
 			x = 0.;
 		}
+		this.x = x;
+		this.y = y;
+	}
+	set(x,y) {
 		this.x = x;
 		this.y = y;
 	}
@@ -5455,16 +4257,16 @@ class h3d_Buffer {
 			while(_g < flags.length) {
 				let f = flags[_g];
 				++_g;
-				this.flags |= 1 << f._hx_index;
+				this.flags |= 1 << Type.enumIndex(f);
 			}
 		}
 		if((this.flags & 32) == 0) {
-			h3d_Engine.CURRENT.mem.allocBuffer(this,stride);
+			h3d_Engine.getCurrent().mem.allocBuffer(this,stride);
 		}
 	}
 	isDisposed() {
 		if(this.buffer != null) {
-			return this.buffer.vbuf == null;
+			return this.buffer.isDisposed();
 		} else {
 			return true;
 		}
@@ -5500,7 +4302,7 @@ class h3d_Buffer {
 		}
 	}
 	static ofFloats(v,stride,flags) {
-		let nvert = v.pos / stride | 0;
+		let nvert = Std.int(v.pos / stride);
 		let b = new h3d_Buffer(nvert,stride,flags);
 		b.uploadVector(v,0,nvert);
 		return b;
@@ -5559,29 +4361,13 @@ class h3d_Camera {
 	}
 	unproject(screenX,screenY,camZ) {
 		let p = new h3d_Vector(screenX,screenY,camZ);
-		let m = this.getInverseViewProj();
-		let px = p.x * m._11 + p.y * m._21 + p.z * m._31 + p.w * m._41;
-		let py = p.x * m._12 + p.y * m._22 + p.z * m._32 + p.w * m._42;
-		let pz = p.x * m._13 + p.y * m._23 + p.z * m._33 + p.w * m._43;
-		let iw = 1 / (p.x * m._14 + p.y * m._24 + p.z * m._34 + p.w * m._44);
-		p.x = px * iw;
-		p.y = py * iw;
-		p.z = pz * iw;
-		p.w = 1;
+		p.project(this.getInverseViewProj());
 		return p;
 	}
 	update() {
 		if(this.follow != null) {
-			let _this = this.pos;
-			_this.x = 0;
-			_this.y = 0;
-			_this.z = 0;
-			_this.w = 1.;
-			let _this1 = this.target;
-			_this1.x = 0;
-			_this1.y = 0;
-			_this1.z = 0;
-			_this1.w = 1.;
+			this.pos.set(0,0,0);
+			this.target.set(0,0,0);
 			this.follow.pos.localToGlobal(this.pos);
 			this.follow.target.localToGlobal(this.target);
 			if(this.follow.pos.name != null) {
@@ -5617,94 +4403,34 @@ class h3d_Camera {
 		return [this.unproject(-1,1,0),this.unproject(1,1,0),this.unproject(1,-1,0),this.unproject(-1,-1,0),this.unproject(-1,1,zMax),this.unproject(1,1,zMax),this.unproject(1,-1,zMax),this.unproject(-1,-1,zMax)];
 	}
 	makeCameraMatrix(m) {
-		let _this = this.target;
-		let v = this.pos;
-		let x = _this.x - v.x;
-		let y = _this.y - v.y;
-		let z = _this.z - v.z;
-		let w = _this.w - v.w;
-		if(w == null) {
-			w = 1.;
-		}
-		if(z == null) {
-			z = 0.;
-		}
-		if(y == null) {
-			y = 0.;
-		}
-		if(x == null) {
-			x = 0.;
-		}
-		let az_x = x;
-		let az_y = y;
-		let az_z = z;
+		let az = this.target.sub(this.pos);
 		if(this.rightHanded) {
-			az_x *= -1;
-			az_y *= -1;
-			az_z *= -1;
+			az.scale3(-1);
 		}
-		let k = 1. / Math.sqrt(az_x * az_x + az_y * az_y + az_z * az_z);
-		az_x *= k;
-		az_y *= k;
-		az_z *= k;
-		let _this1 = this.up;
-		let x1 = _this1.y * az_z - _this1.z * az_y;
-		let y1 = _this1.z * az_x - _this1.x * az_z;
-		let z1 = _this1.x * az_y - _this1.y * az_x;
-		if(z1 == null) {
-			z1 = 0.;
+		az.normalizeFast();
+		let ax = this.up.cross(az);
+		ax.normalizeFast();
+		if(ax.length() == 0) {
+			ax.x = az.y;
+			ax.y = az.z;
+			ax.z = az.x;
 		}
-		if(y1 == null) {
-			y1 = 0.;
-		}
-		if(x1 == null) {
-			x1 = 0.;
-		}
-		let ax_x = x1;
-		let ax_y = y1;
-		let ax_z = z1;
-		let k1 = 1. / Math.sqrt(ax_x * ax_x + ax_y * ax_y + ax_z * ax_z);
-		ax_x *= k1;
-		ax_y *= k1;
-		ax_z *= k1;
-		if(Math.sqrt(ax_x * ax_x + ax_y * ax_y + ax_z * ax_z) == 0) {
-			ax_x = az_y;
-			ax_y = az_z;
-			ax_z = az_x;
-		}
-		let x2 = az_y * ax_z - az_z * ax_y;
-		let y2 = az_z * ax_x - az_x * ax_z;
-		let z2 = az_x * ax_y - az_y * ax_x;
-		if(z2 == null) {
-			z2 = 0.;
-		}
-		if(y2 == null) {
-			y2 = 0.;
-		}
-		if(x2 == null) {
-			x2 = 0.;
-		}
-		let ay_x = x2;
-		let ay_y = y2;
-		let ay_z = z2;
-		m._11 = ax_x;
-		m._12 = ay_x;
-		m._13 = az_x;
+		let ay = az.cross(ax);
+		m._11 = ax.x;
+		m._12 = ay.x;
+		m._13 = az.x;
 		m._14 = 0;
-		m._21 = ax_y;
-		m._22 = ay_y;
-		m._23 = az_y;
+		m._21 = ax.y;
+		m._22 = ay.y;
+		m._23 = az.y;
 		m._24 = 0;
-		m._31 = ax_z;
-		m._32 = ay_z;
-		m._33 = az_z;
+		m._31 = ax.z;
+		m._32 = ay.z;
+		m._33 = az.z;
 		m._34 = 0;
-		let v1 = this.pos;
-		m._41 = -(ax_x * v1.x + ax_y * v1.y + ax_z * v1.z);
-		let v2 = this.pos;
-		m._42 = -(ay_x * v2.x + ay_y * v2.y + ay_z * v2.z);
-		let v3 = this.pos;
-		m._43 = -(az_x * v3.x + az_y * v3.y + az_z * v3.z);
+		m._41 = -ax.dot3(this.pos);
+		m._42 = -ay.dot3(this.pos);
+		m._43 = -az.dot3(this.pos);
 		m._44 = 1;
 	}
 	makeFrustumMatrix(m) {
@@ -5774,18 +4500,19 @@ class h3d_Engine {
 		this.set_fullScreen(!hxd_System.getValue(hxd_SystemValue.IsWindowed));
 		this.window = hxd_Window.getInstance();
 		this.realFps = hxd_System.getDefaultFrameRate();
-		this.lastTime = HxOverrides.now() / 1000;
+		this.lastTime = haxe_Timer.stamp();
 		this.window.addResizeEvent($bind(this,this.onWindowResize));
 		this.driver = new h3d_impl_GlDriver(this.antiAlias);
+		this.setCurrent();
+	}
+	setCurrent() {
 		h3d_Engine.CURRENT = this;
 	}
 	init() {
 		this.driver.init($bind(this,this.onCreate),!this.hardware);
 	}
 	selectShader(shader) {
-		if(this.needFlushTarget) {
-			this.doFlushTarget();
-		}
+		this.flushTarget();
 		if(this.driver.selectShader(shader)) {
 			this.shaderSwitches++;
 		}
@@ -5800,11 +4527,27 @@ class h3d_Engine {
 		if(buf.isDisposed()) {
 			return false;
 		}
-		if(this.needFlushTarget) {
-			this.doFlushTarget();
-		}
+		this.flushTarget();
 		this.driver.selectBuffer(buf);
 		return true;
+	}
+	renderTriBuffer(b,start,max) {
+		if(max == null) {
+			max = -1;
+		}
+		if(start == null) {
+			start = 0;
+		}
+		this.renderBuffer(b,this.mem.triIndexes,3,start,max);
+	}
+	renderQuadBuffer(b,start,max) {
+		if(max == null) {
+			max = -1;
+		}
+		if(start == null) {
+			start = 0;
+		}
+		this.renderBuffer(b,this.mem.quadIndexes,2,start,max);
 	}
 	renderBuffer(b,indexes,vertPerTri,startTri,drawTri) {
 		if(drawTri == null) {
@@ -5817,8 +4560,8 @@ class h3d_Engine {
 			return;
 		}
 		while(true) {
-			let ntri = b.vertices / vertPerTri | 0;
-			let pos = b.position / vertPerTri | 0;
+			let ntri = Std.int(b.vertices / vertPerTri);
+			let pos = Std.int(b.position / vertPerTri);
 			if(startTri > 0) {
 				if(startTri >= ntri) {
 					startTri -= ntri;
@@ -5867,7 +4610,7 @@ class h3d_Engine {
 		if(indexes.isDisposed()) {
 			return;
 		}
-		let maxTri = indexes.count / 3 | 0;
+		let maxTri = Std.int(indexes.count / 3);
 		if(drawTri < 0) {
 			drawTri = maxTri - startTri;
 		}
@@ -5883,7 +4626,7 @@ class h3d_Engine {
 		return d;
 	}
 	onCreate(disposed) {
-		h3d_Engine.CURRENT = this;
+		this.setCurrent();
 		if(this.autoResize) {
 			this.width = this.window.get_width();
 			this.height = this.window.get_height();
@@ -6008,6 +4751,11 @@ class h3d_Engine {
 		c.next = this.targetTmp;
 		this.targetTmp = c;
 	}
+	flushTarget() {
+		if(this.needFlushTarget) {
+			this.doFlushTarget();
+		}
+	}
 	doFlushTarget() {
 		let t = this.targetStack;
 		if(t == null) {
@@ -6027,15 +4775,9 @@ class h3d_Engine {
 	}
 	clear(color,depth,stencil) {
 		if(color != null) {
-			let _this = this.tmpVector;
-			_this.x = (color >> 16 & 255) / 255;
-			_this.y = (color >> 8 & 255) / 255;
-			_this.z = (color & 255) / 255;
-			_this.w = (color >>> 24) / 255;
+			this.tmpVector.setColor(color);
 		}
-		if(this.needFlushTarget) {
-			this.doFlushTarget();
-		}
+		this.flushTarget();
 		this.driver.clear(color == null ? null : this.tmpVector,depth,stencil);
 	}
 	setRenderZone(x,y,width,height) {
@@ -6051,9 +4793,7 @@ class h3d_Engine {
 		if(x == null) {
 			x = 0;
 		}
-		if(this.needFlushTarget) {
-			this.doFlushTarget();
-		}
+		this.flushTarget();
 		this.driver.setRenderZone(x,y,width,height);
 	}
 	render(obj) {
@@ -6062,7 +4802,7 @@ class h3d_Engine {
 		}
 		obj.render(this);
 		this.end();
-		let delta = HxOverrides.now() / 1000 - this.lastTime;
+		let delta = haxe_Timer.stamp() - this.lastTime;
 		this.lastTime += delta;
 		if(delta > 0) {
 			let curFps = 1. / delta;
@@ -6079,6 +4819,9 @@ class h3d_Engine {
 		}
 		return true;
 	}
+	static getCurrent() {
+		return h3d_Engine.CURRENT;
+	}
 }
 h3d_Engine.__name__ = "h3d.Engine";
 Object.assign(h3d_Engine.prototype, {
@@ -6089,7 +4832,7 @@ class h3d_Indexes {
 		if(is32 == null) {
 			is32 = false;
 		}
-		this.mem = h3d_Engine.CURRENT.mem;
+		this.mem = h3d_Engine.getCurrent().mem;
 		this.count = count;
 		this.is32 = is32;
 		this.mem.allocIndexes(this);
@@ -6130,6 +4873,24 @@ Object.assign(h3d_Indexes.prototype, {
 class h3d_Matrix {
 	constructor() {
 	}
+	get_tx() {
+		return this._41;
+	}
+	get_ty() {
+		return this._42;
+	}
+	get_tz() {
+		return this._43;
+	}
+	set_tx(v) {
+		return this._41 = v;
+	}
+	set_ty(v) {
+		return this._42 = v;
+	}
+	set_tz(v) {
+		return this._43 = v;
+	}
 	zero() {
 		this._11 = 0.0;
 		this._12 = 0.0;
@@ -6166,7 +4927,24 @@ class h3d_Matrix {
 		this._43 = 0.0;
 		this._44 = 1.0;
 	}
+	getScale(v) {
+		if(v == null) {
+			v = new h3d_Vector();
+		}
+		v.x = hxd_Math.sqrt(this._11 * this._11 + this._12 * this._12 + this._13 * this._13);
+		v.y = hxd_Math.sqrt(this._21 * this._21 + this._22 * this._22 + this._23 * this._23);
+		v.z = hxd_Math.sqrt(this._31 * this._31 + this._32 * this._32 + this._33 * this._33);
+		if(this.getDeterminant() < 0) {
+			v.x *= -1;
+			v.y *= -1;
+			v.z *= -1;
+		}
+		return v;
+	}
 	multiply3x4(a,b) {
+		this.multiply3x4inline(a,b);
+	}
+	multiply3x4inline(a,b) {
 		let m11 = a._11;
 		let m12 = a._12;
 		let m13 = a._13;
@@ -6258,6 +5036,9 @@ class h3d_Matrix {
 		this._43 = a41 * b13 + a42 * b23 + a43 * b33 + a44 * b43;
 		this._44 = a41 * b14 + a42 * b24 + a43 * b34 + a44 * b44;
 	}
+	getDeterminant() {
+		return this._11 * (this._22 * this._33 - this._23 * this._32) + this._12 * (this._23 * this._31 - this._21 * this._33) + this._13 * (this._21 * this._32 - this._22 * this._31);
+	}
 	inverse3x4(m) {
 		let m11 = m._11;
 		let m12 = m._12;
@@ -6289,7 +5070,7 @@ class h3d_Matrix {
 		this._44 = m11 * m22 * m33 - m11 * m23 * m32 - m21 * m12 * m33 + m21 * m13 * m32 + m31 * m12 * m23 - m31 * m13 * m22;
 		this._44 = 1;
 		let det = m11 * this._11 + m12 * this._21 + m13 * this._31;
-		if((det < 0 ? -det : det) < 1e-10) {
+		if(hxd_Math.abs(det) < 1e-10) {
 			this.zero();
 			return;
 		}
@@ -6341,7 +5122,7 @@ class h3d_Matrix {
 		this._43 = -m11 * m22 * m43 + m11 * m23 * m42 + m21 * m12 * m43 - m21 * m13 * m42 - m41 * m12 * m23 + m41 * m13 * m22;
 		this._44 = m11 * m22 * m33 - m11 * m23 * m32 - m21 * m12 * m33 + m21 * m13 * m32 + m31 * m12 * m23 - m31 * m13 * m22;
 		let det = m11 * this._11 + m12 * this._21 + m13 * this._31 + m14 * this._41;
-		if((det < 0 ? -det : det) < 1e-10) {
+		if(hxd_Math.abs(det) < 1e-10) {
 			this.zero();
 			return;
 		}
@@ -6465,16 +5246,138 @@ class h3d_Vector {
 		this.z = z;
 		this.w = w;
 	}
+	sub(v) {
+		return new h3d_Vector(this.x - v.x,this.y - v.y,this.z - v.z,this.w - v.w);
+	}
+	cross(v) {
+		return new h3d_Vector(this.y * v.z - this.z * v.y,this.z * v.x - this.x * v.z,this.x * v.y - this.y * v.x,1);
+	}
+	dot3(v) {
+		return this.x * v.x + this.y * v.y + this.z * v.z;
+	}
+	lengthSq() {
+		return this.x * this.x + this.y * this.y + this.z * this.z;
+	}
+	length() {
+		return hxd_Math.sqrt(this.lengthSq());
+	}
 	normalize() {
-		let k = this.x * this.x + this.y * this.y + this.z * this.z;
+		let k = this.lengthSq();
 		if(k < 1e-10) {
 			k = 0;
 		} else {
-			k = 1. / Math.sqrt(k);
+			k = hxd_Math.invSqrt(k);
 		}
 		this.x *= k;
 		this.y *= k;
 		this.z *= k;
+	}
+	normalizeFast() {
+		let k = hxd_Math.invSqrt(this.lengthSq());
+		this.x *= k;
+		this.y *= k;
+		this.z *= k;
+	}
+	set(x,y,z,w) {
+		if(w == null) {
+			w = 1.;
+		}
+		if(z == null) {
+			z = 0.;
+		}
+		if(y == null) {
+			y = 0.;
+		}
+		if(x == null) {
+			x = 0.;
+		}
+		this.x = x;
+		this.y = y;
+		this.z = z;
+		this.w = w;
+	}
+	load(v) {
+		this.x = v.x;
+		this.y = v.y;
+		this.z = v.z;
+		this.w = v.w;
+	}
+	scale3(f) {
+		this.x *= f;
+		this.y *= f;
+		this.z *= f;
+	}
+	project(m) {
+		let px = this.x * m._11 + this.y * m._21 + this.z * m._31 + this.w * m._41;
+		let py = this.x * m._12 + this.y * m._22 + this.z * m._32 + this.w * m._42;
+		let pz = this.x * m._13 + this.y * m._23 + this.z * m._33 + this.w * m._43;
+		let iw = 1 / (this.x * m._14 + this.y * m._24 + this.z * m._34 + this.w * m._44);
+		this.x = px * iw;
+		this.y = py * iw;
+		this.z = pz * iw;
+		this.w = 1;
+	}
+	transform3x4(m) {
+		let px = this.x * m._11 + this.y * m._21 + this.z * m._31 + this.w * m._41;
+		let py = this.x * m._12 + this.y * m._22 + this.z * m._32 + this.w * m._42;
+		let pz = this.x * m._13 + this.y * m._23 + this.z * m._33 + this.w * m._43;
+		this.x = px;
+		this.y = py;
+		this.z = pz;
+	}
+	transform3x3(m) {
+		let px = this.x * m._11 + this.y * m._21 + this.z * m._31;
+		let py = this.x * m._12 + this.y * m._22 + this.z * m._32;
+		let pz = this.x * m._13 + this.y * m._23 + this.z * m._33;
+		this.x = px;
+		this.y = py;
+		this.z = pz;
+	}
+	transform(m) {
+		let px = this.x * m._11 + this.y * m._21 + this.z * m._31 + this.w * m._41;
+		let py = this.x * m._12 + this.y * m._22 + this.z * m._32 + this.w * m._42;
+		let pz = this.x * m._13 + this.y * m._23 + this.z * m._33 + this.w * m._43;
+		let pw = this.x * m._14 + this.y * m._24 + this.z * m._34 + this.w * m._44;
+		this.x = px;
+		this.y = py;
+		this.z = pz;
+		this.w = pw;
+	}
+	clone() {
+		return new h3d_Vector(this.x,this.y,this.z,this.w);
+	}
+	toPoint() {
+		return new h3d_col_Point(this.x,this.y,this.z);
+	}
+	get_r() {
+		return this.x;
+	}
+	get_g() {
+		return this.y;
+	}
+	get_b() {
+		return this.z;
+	}
+	get_a() {
+		return this.w;
+	}
+	set_r(v) {
+		return this.x = v;
+	}
+	set_g(v) {
+		return this.y = v;
+	}
+	set_b(v) {
+		return this.z = v;
+	}
+	set_a(v) {
+		return this.w = v;
+	}
+	setColor(c) {
+		this.set_r((c >> 16 & 255) / 255);
+		this.set_g((c >> 8 & 255) / 255);
+		this.set_b((c & 255) / 255);
+		this.set_a((c >>> 24) / 255);
 	}
 }
 h3d_Vector.__name__ = "h3d.Vector";
@@ -6523,8 +5426,8 @@ class h3d_anim_Animation {
 			return 0;
 		}
 		if(this.events != null && this.onEvent != null) {
-			let f0 = this.frame | 0;
-			let f1 = this.frame + dt * this.speed * this.sampling | 0;
+			let f0 = Std.int(this.frame);
+			let f1 = Std.int(this.frame + dt * this.speed * this.sampling);
 			if(f1 >= this.frameCount) {
 				f1 = this.frameCount - 1;
 			}
@@ -6587,23 +5490,44 @@ class h3d_anim_Animation {
 	}
 }
 h3d_anim_Animation.__name__ = "h3d.anim.Animation";
+h3d_anim_Animation.__interfaces__ = [hxd_impl__$Serializable_NoSerializeSupport];
 Object.assign(h3d_anim_Animation.prototype, {
 	__class__: h3d_anim_Animation
 });
+class h3d_col_Collider {
+}
+h3d_col_Collider.__name__ = "h3d.col.Collider";
+h3d_col_Collider.__isInterface__ = true;
+h3d_col_Collider.__interfaces__ = [hxd_impl__$Serializable_NoSerializeSupport];
+Object.assign(h3d_col_Collider.prototype, {
+	__class__: h3d_col_Collider
+});
 class h3d_col_Bounds {
 	constructor() {
-		this.xMin = 1e20;
-		this.xMax = -1e20;
-		this.yMin = 1e20;
-		this.yMax = -1e20;
-		this.zMin = 1e20;
-		this.zMax = -1e20;
+		this.empty();
 	}
 	inFrustum(f,m) {
 		if(m != null) {
 			throw haxe_Exception.thrown("Not implemented");
 		}
 		return f.hasBounds(this);
+	}
+	testPlane(p) {
+		let a = p.nx;
+		let b = p.ny;
+		let c = p.nz;
+		let dd = a * (this.xMax + this.xMin) + b * (this.yMax + this.yMin) + c * (this.zMax + this.zMin);
+		if(a < 0) {
+			a = -a;
+		}
+		if(b < 0) {
+			b = -b;
+		}
+		if(c < 0) {
+			c = -c;
+		}
+		let rr = a * (this.xMax - this.xMin) + b * (this.yMax - this.yMin) + c * (this.zMax - this.zMin);
+		return dd + rr - p.d * 2;
 	}
 	rayIntersection(r,bestMatch) {
 		let minTx = (this.xMin - r.px) / r.lx;
@@ -6612,40 +5536,66 @@ class h3d_col_Bounds {
 		let maxTx = (this.xMax - r.px) / r.lx;
 		let maxTy = (this.yMax - r.py) / r.ly;
 		let maxTz = (this.zMax - r.pz) / r.lz;
-		let realMinTx = minTx > maxTx ? maxTx : minTx;
-		let realMinTy = minTy > maxTy ? maxTy : minTy;
-		let realMinTz = minTz > maxTz ? maxTz : minTz;
-		let realMaxTx = minTx < maxTx ? maxTx : minTx;
-		let realMaxTy = minTy < maxTy ? maxTy : minTy;
-		let realMaxTz = minTz < maxTz ? maxTz : minTz;
-		let a = realMaxTx > realMaxTy ? realMaxTy : realMaxTx;
-		let minmax = a > realMaxTz ? realMaxTz : a;
-		let a1 = realMinTx < realMinTy ? realMinTy : realMinTx;
-		let maxmin = a1 < realMinTz ? realMinTz : a1;
+		let realMinTx = hxd_Math.min(minTx,maxTx);
+		let realMinTy = hxd_Math.min(minTy,maxTy);
+		let realMinTz = hxd_Math.min(minTz,maxTz);
+		let realMaxTx = hxd_Math.max(minTx,maxTx);
+		let realMaxTy = hxd_Math.max(minTy,maxTy);
+		let realMaxTz = hxd_Math.max(minTz,maxTz);
+		let minmax = hxd_Math.min(hxd_Math.min(realMaxTx,realMaxTy),realMaxTz);
+		let maxmin = hxd_Math.max(hxd_Math.max(realMinTx,realMinTy),realMinTz);
 		if(minmax < maxmin) {
 			return -1;
 		}
 		return maxmin;
 	}
+	addPoint(p) {
+		if(p.x < this.xMin) {
+			this.xMin = p.x;
+		}
+		if(p.x > this.xMax) {
+			this.xMax = p.x;
+		}
+		if(p.y < this.yMin) {
+			this.yMin = p.y;
+		}
+		if(p.y > this.yMax) {
+			this.yMax = p.y;
+		}
+		if(p.z < this.zMin) {
+			this.zMin = p.z;
+		}
+		if(p.z > this.zMax) {
+			this.zMax = p.z;
+		}
+	}
+	addPos(x,y,z) {
+		if(x < this.xMin) {
+			this.xMin = x;
+		}
+		if(x > this.xMax) {
+			this.xMax = x;
+		}
+		if(y < this.yMin) {
+			this.yMin = y;
+		}
+		if(y > this.yMax) {
+			this.yMax = y;
+		}
+		if(z < this.zMin) {
+			this.zMin = z;
+		}
+		if(z > this.zMax) {
+			this.zMax = z;
+		}
+	}
 	intersection(a,b) {
-		let a1 = a.xMin;
-		let b1 = b.xMin;
-		let xMin = a1 < b1 ? b1 : a1;
-		let a2 = a.yMin;
-		let b2 = b.yMin;
-		let yMin = a2 < b2 ? b2 : a2;
-		let a3 = a.zMin;
-		let b3 = b.zMin;
-		let zMin = a3 < b3 ? b3 : a3;
-		let a4 = a.xMax;
-		let b4 = b.xMax;
-		let xMax = a4 > b4 ? b4 : a4;
-		let a5 = a.yMax;
-		let b5 = b.yMax;
-		let yMax = a5 > b5 ? b5 : a5;
-		let a6 = a.zMax;
-		let b6 = b.zMax;
-		let zMax = a6 > b6 ? b6 : a6;
+		let xMin = hxd_Math.max(a.xMin,b.xMin);
+		let yMin = hxd_Math.max(a.yMin,b.yMin);
+		let zMin = hxd_Math.max(a.zMin,b.zMin);
+		let xMax = hxd_Math.min(a.xMax,b.xMax);
+		let yMax = hxd_Math.min(a.yMax,b.yMax);
+		let zMax = hxd_Math.min(a.zMax,b.zMax);
 		this.xMin = xMin;
 		this.xMax = xMax;
 		this.yMin = yMin;
@@ -6667,243 +5617,88 @@ class h3d_col_Bounds {
 		this.yMax = my + dy;
 		this.zMax = mz + dz;
 	}
+	empty() {
+		this.xMin = 1e20;
+		this.xMax = -1e20;
+		this.yMin = 1e20;
+		this.yMax = -1e20;
+		this.zMin = 1e20;
+		this.zMax = -1e20;
+	}
 }
 h3d_col_Bounds.__name__ = "h3d.col.Bounds";
+h3d_col_Bounds.__interfaces__ = [h3d_col_Collider];
 Object.assign(h3d_col_Bounds.prototype, {
 	__class__: h3d_col_Bounds
 });
 class h3d_col_Frustum {
 	constructor(mvp) {
 		this.checkNearFar = true;
-		this.pleft = new h3d_col_Plane(1,0,0,0.0);
-		this.pright = new h3d_col_Plane(1,0,0,0.0);
-		this.ptop = new h3d_col_Plane(1,0,0,0.0);
-		this.pbottom = new h3d_col_Plane(1,0,0,0.0);
-		this.pnear = new h3d_col_Plane(1,0,0,0.0);
-		this.pfar = new h3d_col_Plane(1,0,0,0.0);
+		this.pleft = h3d_col_Plane.X();
+		this.pright = h3d_col_Plane.X();
+		this.ptop = h3d_col_Plane.X();
+		this.pbottom = h3d_col_Plane.X();
+		this.pnear = h3d_col_Plane.X();
+		this.pfar = h3d_col_Plane.X();
 		if(mvp != null) {
 			this.loadMatrix(mvp);
 		}
 	}
 	loadMatrix(mvp) {
-		let _this = this.pleft;
-		_this.nx = mvp._14 + mvp._11;
-		_this.ny = mvp._24 + mvp._21;
-		_this.nz = mvp._34 + mvp._31;
-		_this.d = -(mvp._44 + mvp._41);
-		let _this1 = this.pright;
-		_this1.nx = mvp._14 - mvp._11;
-		_this1.ny = mvp._24 - mvp._21;
-		_this1.nz = mvp._34 - mvp._31;
-		_this1.d = mvp._41 - mvp._44;
-		let _this2 = this.ptop;
-		_this2.nx = mvp._14 - mvp._12;
-		_this2.ny = mvp._24 - mvp._22;
-		_this2.nz = mvp._34 - mvp._32;
-		_this2.d = mvp._42 - mvp._44;
-		let _this3 = this.pbottom;
-		_this3.nx = mvp._14 + mvp._12;
-		_this3.ny = mvp._24 + mvp._22;
-		_this3.nz = mvp._34 + mvp._32;
-		_this3.d = -(mvp._44 + mvp._42);
-		let _this4 = this.pnear;
-		_this4.nx = mvp._13;
-		_this4.ny = mvp._23;
-		_this4.nz = mvp._33;
-		_this4.d = -mvp._43;
-		let _this5 = this.pfar;
-		_this5.nx = mvp._14 - mvp._13;
-		_this5.ny = mvp._24 - mvp._23;
-		_this5.nz = mvp._34 - mvp._33;
-		_this5.d = mvp._43 - mvp._44;
-		let _this6 = this.pleft;
-		let len = 1. / Math.sqrt(_this6.nx * _this6.nx + _this6.ny * _this6.ny + _this6.nz * _this6.nz);
-		_this6.nx *= len;
-		_this6.ny *= len;
-		_this6.nz *= len;
-		_this6.d *= len;
-		let _this7 = this.pright;
-		let len1 = 1. / Math.sqrt(_this7.nx * _this7.nx + _this7.ny * _this7.ny + _this7.nz * _this7.nz);
-		_this7.nx *= len1;
-		_this7.ny *= len1;
-		_this7.nz *= len1;
-		_this7.d *= len1;
-		let _this8 = this.ptop;
-		let len2 = 1. / Math.sqrt(_this8.nx * _this8.nx + _this8.ny * _this8.ny + _this8.nz * _this8.nz);
-		_this8.nx *= len2;
-		_this8.ny *= len2;
-		_this8.nz *= len2;
-		_this8.d *= len2;
-		let _this9 = this.pbottom;
-		let len3 = 1. / Math.sqrt(_this9.nx * _this9.nx + _this9.ny * _this9.ny + _this9.nz * _this9.nz);
-		_this9.nx *= len3;
-		_this9.ny *= len3;
-		_this9.nz *= len3;
-		_this9.d *= len3;
-		let _this10 = this.pnear;
-		let len4 = 1. / Math.sqrt(_this10.nx * _this10.nx + _this10.ny * _this10.ny + _this10.nz * _this10.nz);
-		_this10.nx *= len4;
-		_this10.ny *= len4;
-		_this10.nz *= len4;
-		_this10.d *= len4;
-		let _this11 = this.pfar;
-		let len5 = 1. / Math.sqrt(_this11.nx * _this11.nx + _this11.ny * _this11.ny + _this11.nz * _this11.nz);
-		_this11.nx *= len5;
-		_this11.ny *= len5;
-		_this11.nz *= len5;
-		_this11.d *= len5;
+		this.pleft.load(h3d_col_Plane.frustumLeft(mvp));
+		this.pright.load(h3d_col_Plane.frustumRight(mvp));
+		this.ptop.load(h3d_col_Plane.frustumTop(mvp));
+		this.pbottom.load(h3d_col_Plane.frustumBottom(mvp));
+		this.pnear.load(h3d_col_Plane.frustumNear(mvp));
+		this.pfar.load(h3d_col_Plane.frustumFar(mvp));
+		this.pleft.normalize();
+		this.pright.normalize();
+		this.ptop.normalize();
+		this.pbottom.normalize();
+		this.pnear.normalize();
+		this.pfar.normalize();
 	}
 	hasSphere(s) {
-		let x = s.x;
-		let y = s.y;
-		let z = s.z;
-		if(z == null) {
-			z = 0.;
-		}
-		if(y == null) {
-			y = 0.;
-		}
-		if(x == null) {
-			x = 0.;
-		}
-		let p_x = x;
-		let p_y = y;
-		let p_z = z;
-		let _this = this.pleft;
-		if(_this.nx * p_x + _this.ny * p_y + _this.nz * p_z - _this.d < -s.r) {
+		let p = s.getCenter();
+		if(this.pleft.distance(p) < -s.r) {
 			return false;
 		}
-		let _this1 = this.pright;
-		if(_this1.nx * p_x + _this1.ny * p_y + _this1.nz * p_z - _this1.d < -s.r) {
+		if(this.pright.distance(p) < -s.r) {
 			return false;
 		}
-		let _this2 = this.ptop;
-		if(_this2.nx * p_x + _this2.ny * p_y + _this2.nz * p_z - _this2.d < -s.r) {
+		if(this.ptop.distance(p) < -s.r) {
 			return false;
 		}
-		let _this3 = this.pbottom;
-		if(_this3.nx * p_x + _this3.ny * p_y + _this3.nz * p_z - _this3.d < -s.r) {
+		if(this.pbottom.distance(p) < -s.r) {
 			return false;
 		}
 		if(this.checkNearFar) {
-			let _this = this.pnear;
-			if(_this.nx * p_x + _this.ny * p_y + _this.nz * p_z - _this.d < -s.r) {
+			if(this.pnear.distance(p) < -s.r) {
 				return false;
 			}
-			let _this1 = this.pfar;
-			if(_this1.nx * p_x + _this1.ny * p_y + _this1.nz * p_z - _this1.d < -s.r) {
+			if(this.pfar.distance(p) < -s.r) {
 				return false;
 			}
 		}
 		return true;
 	}
 	hasBounds(b) {
-		let p = this.pleft;
-		let a = p.nx;
-		let b1 = p.ny;
-		let c = p.nz;
-		let dd = a * (b.xMax + b.xMin) + b1 * (b.yMax + b.yMin) + c * (b.zMax + b.zMin);
-		if(a < 0) {
-			a = -a;
-		}
-		if(b1 < 0) {
-			b1 = -b1;
-		}
-		if(c < 0) {
-			c = -c;
-		}
-		let rr = a * (b.xMax - b.xMin) + b1 * (b.yMax - b.yMin) + c * (b.zMax - b.zMin);
-		if(dd + rr - p.d * 2 < 0) {
+		if(b.testPlane(this.pleft) < 0) {
 			return false;
 		}
-		let p1 = this.pright;
-		let a1 = p1.nx;
-		let b2 = p1.ny;
-		let c1 = p1.nz;
-		let dd1 = a1 * (b.xMax + b.xMin) + b2 * (b.yMax + b.yMin) + c1 * (b.zMax + b.zMin);
-		if(a1 < 0) {
-			a1 = -a1;
-		}
-		if(b2 < 0) {
-			b2 = -b2;
-		}
-		if(c1 < 0) {
-			c1 = -c1;
-		}
-		let rr1 = a1 * (b.xMax - b.xMin) + b2 * (b.yMax - b.yMin) + c1 * (b.zMax - b.zMin);
-		if(dd1 + rr1 - p1.d * 2 < 0) {
+		if(b.testPlane(this.pright) < 0) {
 			return false;
 		}
-		let p2 = this.ptop;
-		let a2 = p2.nx;
-		let b3 = p2.ny;
-		let c2 = p2.nz;
-		let dd2 = a2 * (b.xMax + b.xMin) + b3 * (b.yMax + b.yMin) + c2 * (b.zMax + b.zMin);
-		if(a2 < 0) {
-			a2 = -a2;
-		}
-		if(b3 < 0) {
-			b3 = -b3;
-		}
-		if(c2 < 0) {
-			c2 = -c2;
-		}
-		let rr2 = a2 * (b.xMax - b.xMin) + b3 * (b.yMax - b.yMin) + c2 * (b.zMax - b.zMin);
-		if(dd2 + rr2 - p2.d * 2 < 0) {
+		if(b.testPlane(this.ptop) < 0) {
 			return false;
 		}
-		let p3 = this.ptop;
-		let a3 = p3.nx;
-		let b4 = p3.ny;
-		let c3 = p3.nz;
-		let dd3 = a3 * (b.xMax + b.xMin) + b4 * (b.yMax + b.yMin) + c3 * (b.zMax + b.zMin);
-		if(a3 < 0) {
-			a3 = -a3;
-		}
-		if(b4 < 0) {
-			b4 = -b4;
-		}
-		if(c3 < 0) {
-			c3 = -c3;
-		}
-		let rr3 = a3 * (b.xMax - b.xMin) + b4 * (b.yMax - b.yMin) + c3 * (b.zMax - b.zMin);
-		if(dd3 + rr3 - p3.d * 2 < 0) {
+		if(b.testPlane(this.ptop) < 0) {
 			return false;
 		}
-		let p4 = this.pnear;
-		let a4 = p4.nx;
-		let b5 = p4.ny;
-		let c4 = p4.nz;
-		let dd4 = a4 * (b.xMax + b.xMin) + b5 * (b.yMax + b.yMin) + c4 * (b.zMax + b.zMin);
-		if(a4 < 0) {
-			a4 = -a4;
-		}
-		if(b5 < 0) {
-			b5 = -b5;
-		}
-		if(c4 < 0) {
-			c4 = -c4;
-		}
-		let rr4 = a4 * (b.xMax - b.xMin) + b5 * (b.yMax - b.yMin) + c4 * (b.zMax - b.zMin);
-		if(dd4 + rr4 - p4.d * 2 < 0) {
+		if(b.testPlane(this.pnear) < 0) {
 			return false;
 		}
-		let p5 = this.pfar;
-		let a5 = p5.nx;
-		let b6 = p5.ny;
-		let c5 = p5.nz;
-		let dd5 = a5 * (b.xMax + b.xMin) + b6 * (b.yMax + b.yMin) + c5 * (b.zMax + b.zMin);
-		if(a5 < 0) {
-			a5 = -a5;
-		}
-		if(b6 < 0) {
-			b6 = -b6;
-		}
-		if(c5 < 0) {
-			c5 = -c5;
-		}
-		let rr5 = a5 * (b.xMax - b.xMin) + b6 * (b.yMax - b.yMin) + c5 * (b.zMax - b.zMin);
-		if(dd5 + rr5 - p5.d * 2 < 0) {
+		if(b.testPlane(this.pfar) < 0) {
 			return false;
 		}
 		return true;
@@ -6916,6 +5711,24 @@ Object.assign(h3d_col_Frustum.prototype, {
 class h3d_col_Ray {
 	constructor() {
 	}
+	clone() {
+		let r = new h3d_col_Ray();
+		r.px = this.px;
+		r.py = this.py;
+		r.pz = this.pz;
+		r.lx = this.lx;
+		r.ly = this.ly;
+		r.lz = this.lz;
+		return r;
+	}
+	load(r) {
+		this.px = r.px;
+		this.py = r.py;
+		this.pz = r.pz;
+		this.lx = r.lx;
+		this.ly = r.ly;
+		this.lz = r.lz;
+	}
 	normalize() {
 		let l = this.lx * this.lx + this.ly * this.ly + this.lz * this.lz;
 		if(l == 1.) {
@@ -6924,11 +5737,38 @@ class h3d_col_Ray {
 		if(l < 1e-10) {
 			l = 0;
 		} else {
-			l = 1. / Math.sqrt(l);
+			l = hxd_Math.invSqrt(l);
 		}
 		this.lx *= l;
 		this.ly *= l;
 		this.lz *= l;
+	}
+	transform(m) {
+		let p = new h3d_Vector(this.px,this.py,this.pz);
+		p.transform3x4(m);
+		this.px = p.x;
+		this.py = p.y;
+		this.pz = p.z;
+		let l = new h3d_Vector(this.lx,this.ly,this.lz);
+		l.transform3x3(m);
+		this.lx = l.x;
+		this.ly = l.y;
+		this.lz = l.z;
+		this.normalize();
+	}
+	getPoint(distance) {
+		return new h3d_col_Point(this.px + distance * this.lx,this.py + distance * this.ly,this.pz + distance * this.lz);
+	}
+	static fromPoints(p1,p2) {
+		let r = new h3d_col_Ray();
+		r.px = p1.x;
+		r.py = p1.y;
+		r.pz = p1.z;
+		r.lx = p2.x - p1.x;
+		r.ly = p2.y - p1.y;
+		r.lz = p2.z - p1.z;
+		r.normalize();
+		return r;
 	}
 }
 h3d_col_Ray.__name__ = "h3d.col.Ray";
@@ -6942,10 +5782,78 @@ class h3d_col_Plane {
 		this.nz = nz;
 		this.d = d;
 	}
+	load(p) {
+		this.nx = p.nx;
+		this.ny = p.ny;
+		this.nz = p.nz;
+		this.d = p.d;
+	}
+	normalize() {
+		let len = hxd_Math.invSqrt(this.nx * this.nx + this.ny * this.ny + this.nz * this.nz);
+		this.nx *= len;
+		this.ny *= len;
+		this.nz *= len;
+		this.d *= len;
+	}
+	distance(p) {
+		return this.nx * p.x + this.ny * p.y + this.nz * p.z - this.d;
+	}
+	static X(v) {
+		if(v == null) {
+			v = 0.0;
+		}
+		return new h3d_col_Plane(1,0,0,v);
+	}
+	static frustumLeft(mvp) {
+		return new h3d_col_Plane(mvp._14 + mvp._11,mvp._24 + mvp._21,mvp._34 + mvp._31,-(mvp._44 + mvp._41));
+	}
+	static frustumRight(mvp) {
+		return new h3d_col_Plane(mvp._14 - mvp._11,mvp._24 - mvp._21,mvp._34 - mvp._31,mvp._41 - mvp._44);
+	}
+	static frustumBottom(mvp) {
+		return new h3d_col_Plane(mvp._14 + mvp._12,mvp._24 + mvp._22,mvp._34 + mvp._32,-(mvp._44 + mvp._42));
+	}
+	static frustumTop(mvp) {
+		return new h3d_col_Plane(mvp._14 - mvp._12,mvp._24 - mvp._22,mvp._34 - mvp._32,mvp._42 - mvp._44);
+	}
+	static frustumNear(mvp) {
+		return new h3d_col_Plane(mvp._13,mvp._23,mvp._33,-mvp._43);
+	}
+	static frustumFar(mvp) {
+		return new h3d_col_Plane(mvp._14 - mvp._13,mvp._24 - mvp._23,mvp._34 - mvp._33,mvp._43 - mvp._44);
+	}
 }
 h3d_col_Plane.__name__ = "h3d.col.Plane";
 Object.assign(h3d_col_Plane.prototype, {
 	__class__: h3d_col_Plane
+});
+class h3d_col_Point {
+	constructor(x,y,z) {
+		if(z == null) {
+			z = 0.;
+		}
+		if(y == null) {
+			y = 0.;
+		}
+		if(x == null) {
+			x = 0.;
+		}
+		this.x = x;
+		this.y = y;
+		this.z = z;
+	}
+	transform(m) {
+		let px = this.x * m._11 + this.y * m._21 + this.z * m._31 + m._41;
+		let py = this.x * m._12 + this.y * m._22 + this.z * m._32 + m._42;
+		let pz = this.x * m._13 + this.y * m._23 + this.z * m._33 + m._43;
+		this.x = px;
+		this.y = py;
+		this.z = pz;
+	}
+}
+h3d_col_Point.__name__ = "h3d.col.Point";
+Object.assign(h3d_col_Point.prototype, {
+	__class__: h3d_col_Point
 });
 class h3d_col_Sphere {
 	constructor(x,y,z,r) {
@@ -6961,26 +5869,28 @@ class h3d_col_Sphere {
 		if(x == null) {
 			x = 0.;
 		}
-		let sx = x;
-		let sy = y;
-		let sz = z;
-		let sr = r;
-		if(r == null) {
+		this.load(x,y,z,r);
+	}
+	load(sx,sy,sz,sr) {
+		if(sr == null) {
 			sr = 0.;
 		}
-		if(z == null) {
+		if(sz == null) {
 			sz = 0.;
 		}
-		if(y == null) {
+		if(sy == null) {
 			sy = 0.;
 		}
-		if(x == null) {
+		if(sx == null) {
 			sx = 0.;
 		}
 		this.x = sx;
 		this.y = sy;
 		this.z = sz;
 		this.r = sr;
+	}
+	getCenter() {
+		return new h3d_col_Point(this.x,this.y,this.z);
 	}
 	rayIntersection(r,bestMatch) {
 		let r2 = this.r * this.r;
@@ -7009,41 +5919,12 @@ class h3d_col_Sphere {
 		let oldY = this.y;
 		let oldZ = this.z;
 		let oldR = this.r;
-		let x = this.x;
-		let y = this.y;
-		let z = this.z;
-		if(z == null) {
-			z = 0.;
-		}
-		if(y == null) {
-			y = 0.;
-		}
-		if(x == null) {
-			x = 0.;
-		}
-		let v_x = x;
-		let v_y = y;
-		let v_z = z;
-		let px = v_x * m._11 + v_y * m._21 + v_z * m._31 + m._41;
-		let py = v_x * m._12 + v_y * m._22 + v_z * m._32 + m._42;
-		let pz = v_x * m._13 + v_y * m._23 + v_z * m._33 + m._43;
-		v_x = px;
-		v_y = py;
-		v_z = pz;
-		this.x = v_x;
-		this.y = v_y;
-		this.z = v_z;
-		let v = null;
-		v = new h3d_Vector();
-		v.x = Math.sqrt(m._11 * m._11 + m._12 * m._12 + m._13 * m._13);
-		v.y = Math.sqrt(m._21 * m._21 + m._22 * m._22 + m._23 * m._23);
-		v.z = Math.sqrt(m._31 * m._31 + m._32 * m._32 + m._33 * m._33);
-		if(m._11 * (m._22 * m._33 - m._23 * m._32) + m._12 * (m._23 * m._31 - m._21 * m._33) + m._13 * (m._21 * m._32 - m._22 * m._31) < 0) {
-			v.x *= -1;
-			v.y *= -1;
-			v.z *= -1;
-		}
-		let scale = v;
+		let v = this.getCenter();
+		v.transform(m);
+		this.x = v.x;
+		this.y = v.y;
+		this.z = v.z;
+		let scale = m.getScale();
 		this.r *= Math.max(Math.max(scale.x,scale.y),scale.z);
 		let res = f.hasSphere(this);
 		this.x = oldX;
@@ -7054,6 +5935,7 @@ class h3d_col_Sphere {
 	}
 }
 h3d_col_Sphere.__name__ = "h3d.col.Sphere";
+h3d_col_Sphere.__interfaces__ = [h3d_col_Collider];
 Object.assign(h3d_col_Sphere.prototype, {
 	__class__: h3d_col_Sphere
 });
@@ -7075,9 +5957,25 @@ var h3d_impl_RenderFlag = $hxEnums["h3d.impl.RenderFlag"] = { __ename__ : true, 
 	,CameraHandness: {_hx_index:0,__enum__:"h3d.impl.RenderFlag",toString:$estr}
 };
 h3d_impl_RenderFlag.__empty_constructs__ = [h3d_impl_RenderFlag.CameraHandness];
+class haxe_IMap {
+}
+haxe_IMap.__name__ = "haxe.IMap";
+haxe_IMap.__isInterface__ = true;
 class haxe_ds_StringMap {
 	constructor() {
 		this.h = Object.create(null);
+	}
+	exists(key) {
+		return Object.prototype.hasOwnProperty.call(this.h,key);
+	}
+	get(key) {
+		return this.h[key];
+	}
+	set(key,value) {
+		this.h[key] = value;
+	}
+	keys() {
+		return haxe_ds_StringMap.keysIterator(this.h);
 	}
 	static keysIterator(h) {
 		let keys = Object.keys(h);
@@ -7092,6 +5990,7 @@ class haxe_ds_StringMap {
 	}
 }
 haxe_ds_StringMap.__name__ = "haxe.ds.StringMap";
+haxe_ds_StringMap.__interfaces__ = [haxe_IMap];
 Object.assign(haxe_ds_StringMap.prototype, {
 	__class__: haxe_ds_StringMap
 });
@@ -7102,10 +6001,10 @@ class h3d_impl_InputNames {
 	}
 	static get(names) {
 		let key = names.join("|");
-		let i = h3d_impl_InputNames.CACHE.h[key];
+		let i = h3d_impl_InputNames.CACHE.get(key);
 		if(i == null) {
 			i = new h3d_impl_InputNames(names.slice());
-			h3d_impl_InputNames.CACHE.h[key] = i;
+			h3d_impl_InputNames.CACHE.set(key,i);
 		}
 		return i;
 	}
@@ -7306,20 +6205,20 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 		let v = this.gl.getParameter(7938);
 		let reg = new EReg("ES ([0-9]+\\.[0-9]+)","");
 		if(reg.match(v)) {
-			this.glES = parseFloat(reg.matched(1));
+			this.glES = Std.parseFloat(reg.matched(1));
 		}
 		let reg1 = new EReg("[0-9]+\\.[0-9]+","");
 		let v1 = this.gl.getParameter(35724);
 		if(reg1.match(v1)) {
-			this.glES = parseFloat(reg1.matched(0));
-			this.shaderVersion = Math.round(parseFloat(reg1.matched(0)) * 100);
+			this.glES = Std.parseFloat(reg1.matched(0));
+			this.shaderVersion = Math.round(Std.parseFloat(reg1.matched(0)) * 100);
 		}
 		this.drawMode = 4;
 		this.makeFeatures();
 		if(this.hasFeature(h3d_impl_Feature.InstancedRendering) && this.glES < 3) {
 			let extension = this.gl.getExtension("ANGLE_instanced_arrays");
-			this.gl["vertexAttribDivisor"] = $bind(extension,extension.vertexAttribDivisorANGLE);
-			this.gl["drawElementsInstanced"] = $bind(extension,extension.drawElementsInstancedANGLE);
+			Reflect.setField(this.gl,"vertexAttribDivisor",$bind(extension,extension.vertexAttribDivisorANGLE));
+			Reflect.setField(this.gl,"drawElementsInstanced",$bind(extension,extension.drawElementsInstancedANGLE));
 		}
 		hxsl_SharedShader.UNROLL_LOOPS = !this.hasFeature(h3d_impl_Feature.ShaderModel3);
 	}
@@ -7433,7 +6332,7 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 		}
 	}
 	selectShader(shader) {
-		let p = this.programs.h[shader.id];
+		let p = this.programs.get(shader.id);
 		if(p == null) {
 			p = new h3d_impl__$GlDriver_CompiledProgram();
 			let glout = new hxsl_GlslOut();
@@ -7489,7 +6388,7 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 					default:
 						throw haxe_Exception.thrown("assert " + Std.string(v.type));
 					}
-					let index = this.gl.getAttribLocation(p.p,glout.varNames.h.hasOwnProperty(v.id) ? glout.varNames.h[v.id] : v.name);
+					let index = this.gl.getAttribLocation(p.p,glout.varNames.exists(v.id) ? glout.varNames.get(v.id) : v.name);
 					if(index < 0) {
 						p.stride += size;
 						continue;
@@ -7518,7 +6417,7 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 				}
 			}
 			p.inputs = h3d_impl_InputNames.get(attribNames);
-			this.programs.h[shader.id] = p;
+			this.programs.set(shader.id,p);
 		}
 		if(this.curShader == p) {
 			return false;
@@ -7585,7 +6484,7 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 				let i = _g++;
 				let t = buf.tex[i];
 				let pt = s.textures[i];
-				if(t == null || t.t == null && t.realloc == null) {
+				if(t == null || t.isDisposed()) {
 					switch(pt.t._hx_index) {
 					case 10:
 						let color = h3d_mat_Defaults.loadingTextureColor;
@@ -7618,9 +6517,9 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 					this.gl.bindTexture(mode,t.t.t);
 					this.lastActiveIndex = idx;
 				}
-				let mip = t.mipMap._hx_index;
-				let filter = t.filter._hx_index;
-				let wrap = t.wrap._hx_index;
+				let mip = Type.enumIndex(t.mipMap);
+				let filter = Type.enumIndex(t.filter);
+				let wrap = Type.enumIndex(t.wrap);
 				let bits = mip | filter << 3 | wrap << 6;
 				if(bits != t.t.bits) {
 					t.t.bits = bits;
@@ -7691,40 +6590,40 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 		let wireframe = (bits & 268435456) != 0;
 		this.drawMode = wireframe ? 3 : 4;
 		if((diff & 3) != 0) {
-			let cull = bits & 3;
+			let cull = h3d_mat_Pass.getCulling(bits);
 			if(cull == 0) {
 				this.gl.disable(2884);
 			} else {
-				if(this.curMatBits < 0 || (this.curMatBits & 3) == 0) {
+				if(this.curMatBits < 0 || h3d_mat_Pass.getCulling(this.curMatBits) == 0) {
 					this.gl.enable(2884);
 				}
 				this.gl.cullFace(h3d_impl_GlDriver.FACES[cull]);
 			}
 		}
 		if((diff & 4194240) != 0) {
-			let csrc = bits >> 6 & 15;
-			let cdst = bits >> 10 & 15;
-			let asrc = bits >> 14 & 15;
-			let adst = bits >> 18 & 15;
+			let csrc = h3d_mat_Pass.getBlendSrc(bits);
+			let cdst = h3d_mat_Pass.getBlendDst(bits);
+			let asrc = h3d_mat_Pass.getBlendAlphaSrc(bits);
+			let adst = h3d_mat_Pass.getBlendAlphaDst(bits);
 			if(csrc == asrc && cdst == adst) {
 				if(csrc == 0 && cdst == 1) {
 					this.gl.disable(3042);
 				} else {
-					if(this.curMatBits < 0 || (this.curMatBits >> 6 & 15) == 0 && (this.curMatBits >> 10 & 15) == 1) {
+					if(this.curMatBits < 0 || h3d_mat_Pass.getBlendSrc(this.curMatBits) == 0 && h3d_mat_Pass.getBlendDst(this.curMatBits) == 1) {
 						this.gl.enable(3042);
 					}
 					this.gl.blendFunc(h3d_impl_GlDriver.BLEND[csrc],h3d_impl_GlDriver.BLEND[cdst]);
 				}
 			} else {
-				if(this.curMatBits < 0 || (this.curMatBits >> 6 & 15) == 0 && (this.curMatBits >> 10 & 15) == 1) {
+				if(this.curMatBits < 0 || h3d_mat_Pass.getBlendSrc(this.curMatBits) == 0 && h3d_mat_Pass.getBlendDst(this.curMatBits) == 1) {
 					this.gl.enable(3042);
 				}
 				this.gl.blendFuncSeparate(h3d_impl_GlDriver.BLEND[csrc],h3d_impl_GlDriver.BLEND[cdst],h3d_impl_GlDriver.BLEND[asrc],h3d_impl_GlDriver.BLEND[adst]);
 			}
 		}
 		if((diff & 264241152) != 0) {
-			let cop = bits >> 22 & 7;
-			let aop = bits >> 25 & 7;
+			let cop = h3d_mat_Pass.getBlendOp(bits);
+			let aop = h3d_mat_Pass.getBlendAlphaOp(bits);
 			if(cop == aop) {
 				this.gl.blendEquation(h3d_impl_GlDriver.OP[cop]);
 			} else {
@@ -7732,14 +6631,14 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 			}
 		}
 		if((diff & 4) != 0) {
-			this.gl.depthMask((bits >> 2 & 1) != 0);
+			this.gl.depthMask(h3d_mat_Pass.getDepthWrite(bits) != 0);
 		}
 		if((diff & 56) != 0) {
-			let cmp = bits >> 3 & 7;
+			let cmp = h3d_mat_Pass.getDepthTest(bits);
 			if(cmp == 0) {
 				this.gl.disable(2929);
 			} else {
-				if(this.curMatBits < 0 || (this.curMatBits >> 3 & 7) == 0) {
+				if(this.curMatBits < 0 || h3d_mat_Pass.getDepthTest(this.curMatBits) == 0) {
 					this.gl.enable(2929);
 				}
 				this.gl.depthFunc(h3d_impl_GlDriver.COMPARE[cmp]);
@@ -7754,19 +6653,19 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 			return;
 		}
 		if((diffOp & 4088) != 0) {
-			this.gl.stencilOpSeparate(h3d_impl_GlDriver.FACES[2],h3d_impl_GlDriver.STENCIL_OP[opBits >> 6 & 7],h3d_impl_GlDriver.STENCIL_OP[opBits >> 9 & 7],h3d_impl_GlDriver.STENCIL_OP[opBits >> 3 & 7]);
+			this.gl.stencilOpSeparate(h3d_impl_GlDriver.FACES[2],h3d_impl_GlDriver.STENCIL_OP[h3d_mat_Stencil.getFrontSTfail(opBits)],h3d_impl_GlDriver.STENCIL_OP[h3d_mat_Stencil.getFrontDPfail(opBits)],h3d_impl_GlDriver.STENCIL_OP[h3d_mat_Stencil.getFrontPass(opBits)]);
 		}
 		if((diffOp & 16744448) != 0) {
-			this.gl.stencilOpSeparate(h3d_impl_GlDriver.FACES[1],h3d_impl_GlDriver.STENCIL_OP[opBits >> 18 & 7],h3d_impl_GlDriver.STENCIL_OP[opBits >> 21 & 7],h3d_impl_GlDriver.STENCIL_OP[opBits >> 15 & 7]);
+			this.gl.stencilOpSeparate(h3d_impl_GlDriver.FACES[1],h3d_impl_GlDriver.STENCIL_OP[h3d_mat_Stencil.getBackSTfail(opBits)],h3d_impl_GlDriver.STENCIL_OP[h3d_mat_Stencil.getBackDPfail(opBits)],h3d_impl_GlDriver.STENCIL_OP[h3d_mat_Stencil.getBackPass(opBits)]);
 		}
 		if((diffOp & 7 | diffMask & 16711935) != 0) {
-			this.gl.stencilFuncSeparate(h3d_impl_GlDriver.FACES[2],h3d_impl_GlDriver.COMPARE[opBits & 7],maskBits >> 16 & 255,maskBits & 255);
+			this.gl.stencilFuncSeparate(h3d_impl_GlDriver.FACES[2],h3d_impl_GlDriver.COMPARE[h3d_mat_Stencil.getFrontTest(opBits)],h3d_mat_Stencil.getReference(maskBits),h3d_mat_Stencil.getReadMask(maskBits));
 		}
 		if((diffOp & 28672 | diffMask & 16711935) != 0) {
-			this.gl.stencilFuncSeparate(h3d_impl_GlDriver.FACES[1],h3d_impl_GlDriver.COMPARE[opBits >> 12 & 7],maskBits >> 16 & 255,maskBits & 255);
+			this.gl.stencilFuncSeparate(h3d_impl_GlDriver.FACES[1],h3d_impl_GlDriver.COMPARE[h3d_mat_Stencil.getBackTest(opBits)],h3d_mat_Stencil.getReference(maskBits),h3d_mat_Stencil.getReadMask(maskBits));
 		}
 		if((diffMask & 65280) != 0) {
-			let w = maskBits >> 8 & 255;
+			let w = h3d_mat_Stencil.getWriteMask(maskBits);
 			this.gl.stencilMaskSeparate(h3d_impl_GlDriver.FACES[2],w);
 			this.gl.stencilMaskSeparate(h3d_impl_GlDriver.FACES[1],w);
 		}
@@ -7778,7 +6677,7 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 		if(color != null) {
 			this.gl.colorMask(true,true,true,true);
 			this.curColorMask = 15;
-			this.gl.clearColor(color.x,color.y,color.z,color.w);
+			this.gl.clearColor(color.get_r(),color.get_g(),color.get_b(),color.get_a());
 			bits = 16384;
 		}
 		if(depth != null) {
@@ -7803,9 +6702,9 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 	}
 	resize(width,height) {
 		if(this.canvas.style.width == "") {
-			let tmp = width / window.devicePixelRatio | 0;
+			let tmp = Std.int(width / window.devicePixelRatio);
 			this.canvas.style.width = tmp + "px";
-			let tmp1 = height / window.devicePixelRatio | 0;
+			let tmp1 = Std.int(height / window.devicePixelRatio);
 			this.canvas.style.height = tmp1 + "px";
 		}
 		this.canvas.width = width;
@@ -7876,9 +6775,7 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 		}
 	}
 	allocTexture(t) {
-		if(h3d_impl_GlDriver.outOfMemoryCheck) {
-			this.gl.getError();
-		}
+		this.discardError();
 		let tt = this.gl.createTexture();
 		let bind = this.getBindType(t);
 		let tt1 = { t : tt, width : t.width, height : t.height, internalFmt : 6408, pixelFmt : 5121, bits : -1, bind : bind};
@@ -8088,10 +6985,13 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 		this.defaultDepth.b = this.allocDepthBuffer(this.defaultDepth);
 		return this.defaultDepth;
 	}
-	allocVertexes(m) {
+	discardError() {
 		if(h3d_impl_GlDriver.outOfMemoryCheck) {
 			this.gl.getError();
 		}
+	}
+	allocVertexes(m) {
+		this.discardError();
 		let b = this.gl.createBuffer();
 		this.gl.bindBuffer(34962,b);
 		if(m.size * m.stride == 0) {
@@ -8107,9 +7007,7 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 		return { b : b, stride : m.stride};
 	}
 	allocIndexes(count,is32) {
-		if(h3d_impl_GlDriver.outOfMemoryCheck) {
-			this.gl.getError();
-		}
+		this.discardError();
 		let b = this.gl.createBuffer();
 		let size = is32 ? 4 : 2;
 		this.gl.bindBuffer(34963,b);
@@ -8203,6 +7101,12 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 		this.gl.bindBuffer(34963,null);
 		this.curIndexBuffer = null;
 	}
+	updateDivisor(a) {
+		if(this.currentDivisor[a.index] != a.divisor) {
+			this.currentDivisor[a.index] = a.divisor;
+			this.gl.vertexAttribDivisor(a.index,a.divisor);
+		}
+	}
 	selectBuffer(v) {
 		if(v == this.curBuffer) {
 			return;
@@ -8228,10 +7132,7 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 				++_g;
 				let pos = a.offset;
 				this.gl.vertexAttribPointer(a.index,a.size,a.type,false,m.stride * 4,pos * 4);
-				if(this.currentDivisor[a.index] != a.divisor) {
-					this.currentDivisor[a.index] = a.divisor;
-					this.gl.vertexAttribDivisor(a.index,a.divisor);
-				}
+				this.updateDivisor(a);
 			}
 		} else {
 			let offset = 8;
@@ -8266,10 +7167,7 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 					}
 				}
 				this.gl.vertexAttribPointer(a.index,a.size,a.type,false,m.stride * 4,pos * 4);
-				if(this.currentDivisor[a.index] != a.divisor) {
-					this.currentDivisor[a.index] = a.divisor;
-					this.gl.vertexAttribDivisor(a.index,a.divisor);
-				}
+				this.updateDivisor(a);
 			}
 		}
 	}
@@ -8423,7 +7321,7 @@ class h3d_impl_GlDriver extends h3d_impl_Driver {
 	}
 	makeFeatures() {
 		let _g = 0;
-		let _g1 = h3d_impl_Feature.__empty_constructs__.slice();
+		let _g1 = Type.allEnums(h3d_impl_Feature);
 		while(_g < _g1.length) {
 			let f = _g1[_g];
 			++_g;
@@ -8516,13 +7414,13 @@ class h3d_impl_ManagedBuffer {
 			while(_g < flags.length) {
 				let f = flags[_g];
 				++_g;
-				this.flags |= 1 << f._hx_index;
+				this.flags |= 1 << Type.enumIndex(f);
 			}
 		}
 		this.size = size;
 		this.stride = stride;
 		this.freeList = new h3d_impl__$ManagedBuffer_FreeCell(0,size,null);
-		this.mem = h3d_Engine.CURRENT.mem;
+		this.mem = h3d_Engine.getCurrent().mem;
 		this.mem.allocManaged(this);
 	}
 	uploadVertexBuffer(start,vertices,buf,bufPos) {
@@ -8608,6 +7506,9 @@ class h3d_impl_ManagedBuffer {
 	}
 	dispose() {
 		this.mem.freeManaged(this);
+	}
+	isDisposed() {
+		return this.vbuf == null;
 	}
 }
 h3d_impl_ManagedBuffer.__name__ = "h3d.impl.ManagedBuffer";
@@ -8744,7 +7645,7 @@ class h3d_impl_MemoryManager {
 			while(_g < _g1.length) {
 				let f = _g1[_g];
 				++_g;
-				if((b.flags & 1 << f._hx_index) != 0) {
+				if((b.flags & 1 << Type.enumIndex(f)) != 0) {
 					flags.push(f);
 				}
 			}
@@ -8797,7 +7698,7 @@ class h3d_impl_MemoryManager {
 						while(_g < _g1.length) {
 							let f = _g1[_g];
 							++_g;
-							if((b.flags & 1 << f._hx_index) != 0) {
+							if((b.flags & 1 << Type.enumIndex(f)) != 0) {
 								flags.push(f);
 							}
 						}
@@ -8843,7 +7744,7 @@ class h3d_impl_MemoryManager {
 		while(_g < _g1.length) {
 			let t = _g1[_g];
 			++_g;
-			if(t.realloc == null || t.t == null && t.realloc == null) {
+			if(t.realloc == null || t.isDisposed()) {
 				continue;
 			}
 			if(force || t.get_lastFrame() < hxd_Timer.frameCount - 3600) {
@@ -9002,7 +7903,7 @@ class h3d_impl_TextureCache {
 		while(_g < _g1) {
 			let i = _g++;
 			let t2 = this.cache[i];
-			if(t2 != null && !(t2.t == null && t2.realloc == null) && t2.width == width && t2.height == height && t2.format == format && isCube == ((t2.flags & 2) != 0)) {
+			if(t2 != null && !t2.isDisposed() && t2.width == width && t2.height == height && t2.format == format && isCube == ((t2.flags & 2) != 0)) {
 				this.cache[this.position] = t2;
 				this.cache[i] = t;
 				return t2;
@@ -9035,7 +7936,7 @@ class h3d_impl_TextureCache {
 		if(format == null) {
 			format = this.defaultFormat;
 		}
-		if(t == null || t.t == null && t.realloc == null || t.width != width || t.height != height || t.format != format || isCube != ((t.flags & 2) != 0)) {
+		if(t == null || t.isDisposed() || t.width != width || t.height != height || t.format != format || isCube != ((t.flags & 2) != 0)) {
 			t = this.lookupTarget(name,width,height,format,isCube);
 		}
 		t.depthBuffer = defaultDepth ? this.defaultDepthBuffer : null;
@@ -9110,6 +8011,9 @@ class h3d_mat_BaseMaterial extends hxd_impl_AnyProps {
 		}
 		return false;
 	}
+	get_mainPass() {
+		return this.passes;
+	}
 	getPass(name) {
 		let p = this.passes;
 		while(p != null) {
@@ -9122,6 +8026,7 @@ class h3d_mat_BaseMaterial extends hxd_impl_AnyProps {
 	}
 }
 h3d_mat_BaseMaterial.__name__ = "h3d.mat.BaseMaterial";
+h3d_mat_BaseMaterial.__interfaces__ = [hxd_impl__$Serializable_NoSerializeSupport];
 h3d_mat_BaseMaterial.__super__ = hxd_impl_AnyProps;
 Object.assign(h3d_mat_BaseMaterial.prototype, {
 	__class__: h3d_mat_BaseMaterial
@@ -9251,11 +8156,11 @@ class h3d_mat_DepthBuffer {
 		}
 	}
 	alloc() {
-		h3d_Engine.CURRENT.mem.allocDepth(this);
+		h3d_Engine.getCurrent().mem.allocDepth(this);
 	}
 	dispose() {
 		if(this.b != null) {
-			h3d_Engine.CURRENT.mem.deleteDepth(this);
+			h3d_Engine.getCurrent().mem.deleteDepth(this);
 			this.b = null;
 		}
 	}
@@ -9263,7 +8168,7 @@ class h3d_mat_DepthBuffer {
 		return this.b == null;
 	}
 	static getDefault() {
-		return h3d_Engine.CURRENT.driver.getDefaultDepthBuffer();
+		return h3d_Engine.getCurrent().driver.getDefaultDepthBuffer();
 	}
 }
 h3d_mat_DepthBuffer.__name__ = "h3d.mat.DepthBuffer";
@@ -9283,13 +8188,25 @@ class h3d_mat_Material extends h3d_mat_BaseMaterial {
 		super._hx_constructor(this.mshader);
 		this.set_texture(texture);
 	}
+	get_shadows() {
+		if(this.castShadows) {
+			return this.receiveShadows;
+		} else {
+			return false;
+		}
+	}
+	set_shadows(v) {
+		this.set_castShadows(v);
+		this.set_receiveShadows(v);
+		return v;
+	}
 	set_castShadows(v) {
 		if(this.castShadows == v) {
 			return v;
 		}
-		if(this.passes != null) {
+		if(this.get_mainPass() != null) {
 			if(v) {
-				this.addPass(new h3d_mat_Pass("shadow",null,this.passes)).set_isStatic(this.staticShadows);
+				this.addPass(new h3d_mat_Pass("shadow",null,this.get_mainPass())).set_isStatic(this.staticShadows);
 			} else {
 				this.removePass(this.getPass("shadow"));
 			}
@@ -9300,31 +8217,31 @@ class h3d_mat_Material extends h3d_mat_BaseMaterial {
 		if(v == this.receiveShadows) {
 			return v;
 		}
-		if(this.passes != null) {
+		if(this.get_mainPass() != null) {
 			let shadows = h3d_mat_Defaults.get_shadowShader();
 			if(v) {
-				this.passes.addShader(shadows);
+				this.get_mainPass().addShader(shadows);
 			} else {
-				this.passes.removeShader(shadows);
+				this.get_mainPass().removeShader(shadows);
 			}
 		}
 		return this.receiveShadows = v;
 	}
 	set_blendMode(v) {
-		if(this.passes != null) {
-			this.passes.setBlendMode(v);
+		if(this.get_mainPass() != null) {
+			this.get_mainPass().setBlendMode(v);
 			switch(v._hx_index) {
 			case 0:
-				this.passes.set_depthWrite(true);
-				this.passes.setPassName("default");
+				this.get_mainPass().set_depthWrite(true);
+				this.get_mainPass().setPassName("default");
 				break;
 			case 1:
-				this.passes.set_depthWrite(true);
-				this.passes.setPassName("alpha");
+				this.get_mainPass().set_depthWrite(true);
+				this.get_mainPass().setPassName("alpha");
 				break;
 			case 2:case 3:case 4:case 5:case 6:case 7:case 8:case 9:case 10:case 11:
-				this.passes.set_depthWrite(false);
-				this.passes.setPassName("additive");
+				this.get_mainPass().set_depthWrite(false);
+				this.get_mainPass().setPassName("additive");
 				break;
 			}
 		}
@@ -9333,15 +8250,15 @@ class h3d_mat_Material extends h3d_mat_BaseMaterial {
 	set_texture(t) {
 		if(t == null) {
 			if(this.textureShader != null) {
-				this.passes.removeShader(this.textureShader);
+				this.get_mainPass().removeShader(this.textureShader);
 				this.textureShader = null;
 			}
 		} else {
 			if(this.textureShader == null) {
 				this.textureShader = new h3d_shader_Texture();
-				this.passes.addShader(this.textureShader);
+				this.get_mainPass().addShader(this.textureShader);
 			}
-			this.textureShader.texture__ = t;
+			this.textureShader.set_texture(t);
 		}
 		return t;
 	}
@@ -9364,7 +8281,7 @@ class h3d_mat_Material extends h3d_mat_BaseMaterial {
 		return props;
 	}
 	refreshProps() {
-		if(this.props == null || this.passes == null) {
+		if(this.props == null || this.get_mainPass() == null) {
 			return;
 		}
 		let props = this.props;
@@ -9384,17 +8301,15 @@ class h3d_mat_Material extends h3d_mat_BaseMaterial {
 		}
 		let tshader = this.textureShader;
 		if(tshader != null) {
-			tshader.constModified = true;
-			tshader.killAlpha__ = props.kind == "AlphaKill";
-			tshader.killAlphaThreshold__ = 0.5;
+			tshader.set_killAlpha(props.kind == "AlphaKill");
+			tshader.set_killAlphaThreshold(0.5);
 		}
-		this.passes.set_culling(props.kind == "Hidden" ? h3d_mat_Face.Both : props.culling ? h3d_mat_Face.Back : h3d_mat_Face.None);
-		this.passes.set_enableLights(props.light);
-		let v = props.shadows;
-		this.set_castShadows(v);
-		this.set_receiveShadows(v);
-		if(this.castShadows && this.receiveShadows) {
-			this.getPass("shadow").set_culling(this.passes.culling);
+		let tmp = props.kind == "Hidden" ? h3d_mat_Face.Both : props.culling ? h3d_mat_Face.Back : h3d_mat_Face.None;
+		this.get_mainPass().set_culling(tmp);
+		this.get_mainPass().set_enableLights(props.light);
+		this.set_shadows(props.shadows);
+		if(this.get_shadows()) {
+			this.getPass("shadow").set_culling(this.get_mainPass().culling);
 		}
 	}
 }
@@ -9440,12 +8355,7 @@ class h3d_mat_Pass {
 		this.shaders = shaders;
 		this.setPassName(name);
 		this.set_culling(h3d_mat_Face.Back);
-		let src = h3d_mat_Blend.One;
-		let dst = h3d_mat_Blend.Zero;
-		this.set_blendSrc(src);
-		this.set_blendAlphaSrc(src);
-		this.set_blendDst(dst);
-		this.set_blendAlphaDst(dst);
+		this.blend(h3d_mat_Blend.One,h3d_mat_Blend.Zero);
 		this.depth(true,h3d_mat_Compare.Less);
 		this.set_blendOp(this.set_blendAlphaOp(h3d_mat_Operation.Add));
 		this.colorMask = 15;
@@ -9454,105 +8364,61 @@ class h3d_mat_Pass {
 		this.name = name;
 		this.passId = hxsl_Globals.allocID(name);
 	}
+	blend(src,dst) {
+		this.set_blendSrc(src);
+		this.set_blendAlphaSrc(src);
+		this.set_blendDst(dst);
+		this.set_blendAlphaDst(dst);
+	}
 	setBlendMode(b) {
 		switch(b._hx_index) {
 		case 0:
-			let src = h3d_mat_Blend.One;
-			let dst = h3d_mat_Blend.Zero;
-			this.set_blendSrc(src);
-			this.set_blendAlphaSrc(src);
-			this.set_blendDst(dst);
-			this.set_blendAlphaDst(dst);
+			this.blend(h3d_mat_Blend.One,h3d_mat_Blend.Zero);
 			this.set_blendOp(h3d_mat_Operation.Add);
 			this.set_blendAlphaOp(h3d_mat_Operation.Add);
 			break;
 		case 1:
-			let src1 = h3d_mat_Blend.SrcAlpha;
-			let dst1 = h3d_mat_Blend.OneMinusSrcAlpha;
-			this.set_blendSrc(src1);
-			this.set_blendAlphaSrc(src1);
-			this.set_blendDst(dst1);
-			this.set_blendAlphaDst(dst1);
+			this.blend(h3d_mat_Blend.SrcAlpha,h3d_mat_Blend.OneMinusSrcAlpha);
 			this.set_blendOp(h3d_mat_Operation.Add);
 			this.set_blendAlphaOp(h3d_mat_Operation.Add);
 			break;
 		case 2:
-			let src2 = h3d_mat_Blend.SrcAlpha;
-			let dst2 = h3d_mat_Blend.One;
-			this.set_blendSrc(src2);
-			this.set_blendAlphaSrc(src2);
-			this.set_blendDst(dst2);
-			this.set_blendAlphaDst(dst2);
+			this.blend(h3d_mat_Blend.SrcAlpha,h3d_mat_Blend.One);
 			this.set_blendOp(h3d_mat_Operation.Add);
 			this.set_blendAlphaOp(h3d_mat_Operation.Add);
 			break;
 		case 3:
-			let src3 = h3d_mat_Blend.One;
-			let dst3 = h3d_mat_Blend.OneMinusSrcAlpha;
-			this.set_blendSrc(src3);
-			this.set_blendAlphaSrc(src3);
-			this.set_blendDst(dst3);
-			this.set_blendAlphaDst(dst3);
+			this.blend(h3d_mat_Blend.One,h3d_mat_Blend.OneMinusSrcAlpha);
 			this.set_blendOp(h3d_mat_Operation.Add);
 			this.set_blendAlphaOp(h3d_mat_Operation.Add);
 			break;
 		case 4:
-			let src4 = h3d_mat_Blend.OneMinusDstColor;
-			let dst4 = h3d_mat_Blend.One;
-			this.set_blendSrc(src4);
-			this.set_blendAlphaSrc(src4);
-			this.set_blendDst(dst4);
-			this.set_blendAlphaDst(dst4);
+			this.blend(h3d_mat_Blend.OneMinusDstColor,h3d_mat_Blend.One);
 			this.set_blendOp(h3d_mat_Operation.Add);
 			this.set_blendAlphaOp(h3d_mat_Operation.Add);
 			break;
 		case 5:
-			let src5 = h3d_mat_Blend.DstColor;
-			let dst5 = h3d_mat_Blend.Zero;
-			this.set_blendSrc(src5);
-			this.set_blendAlphaSrc(src5);
-			this.set_blendDst(dst5);
-			this.set_blendAlphaDst(dst5);
+			this.blend(h3d_mat_Blend.DstColor,h3d_mat_Blend.Zero);
 			this.set_blendOp(h3d_mat_Operation.Add);
 			this.set_blendAlphaOp(h3d_mat_Operation.Add);
 			break;
 		case 6:
-			let src6 = h3d_mat_Blend.DstColor;
-			let dst6 = h3d_mat_Blend.OneMinusSrcAlpha;
-			this.set_blendSrc(src6);
-			this.set_blendAlphaSrc(src6);
-			this.set_blendDst(dst6);
-			this.set_blendAlphaDst(dst6);
+			this.blend(h3d_mat_Blend.DstColor,h3d_mat_Blend.OneMinusSrcAlpha);
 			this.set_blendOp(h3d_mat_Operation.Add);
 			this.set_blendAlphaOp(h3d_mat_Operation.Add);
 			break;
 		case 7:
-			let src7 = h3d_mat_Blend.Zero;
-			let dst7 = h3d_mat_Blend.OneMinusSrcColor;
-			this.set_blendSrc(src7);
-			this.set_blendAlphaSrc(src7);
-			this.set_blendDst(dst7);
-			this.set_blendAlphaDst(dst7);
+			this.blend(h3d_mat_Blend.Zero,h3d_mat_Blend.OneMinusSrcColor);
 			this.set_blendOp(h3d_mat_Operation.Add);
 			this.set_blendAlphaOp(h3d_mat_Operation.Add);
 			break;
 		case 8:
-			let src8 = h3d_mat_Blend.One;
-			let dst8 = h3d_mat_Blend.OneMinusSrcColor;
-			this.set_blendSrc(src8);
-			this.set_blendAlphaSrc(src8);
-			this.set_blendDst(dst8);
-			this.set_blendAlphaDst(dst8);
+			this.blend(h3d_mat_Blend.One,h3d_mat_Blend.OneMinusSrcColor);
 			this.set_blendOp(h3d_mat_Operation.Add);
 			this.set_blendAlphaOp(h3d_mat_Operation.Add);
 			break;
 		case 9:
-			let src9 = h3d_mat_Blend.SrcAlpha;
-			let dst9 = h3d_mat_Blend.One;
-			this.set_blendSrc(src9);
-			this.set_blendAlphaSrc(src9);
-			this.set_blendDst(dst9);
-			this.set_blendAlphaDst(dst9);
+			this.blend(h3d_mat_Blend.SrcAlpha,h3d_mat_Blend.One);
 			this.set_blendOp(h3d_mat_Operation.ReverseSub);
 			this.set_blendAlphaOp(h3d_mat_Operation.ReverseSub);
 			break;
@@ -9633,7 +8499,7 @@ class h3d_mat_Pass {
 		return this.isStatic = v;
 	}
 	set_culling(v) {
-		this.bits = this.bits & -4 | v._hx_index;
+		this.bits = this.bits & -4 | Type.enumIndex(v);
 		return this.culling = v;
 	}
 	set_depthWrite(v) {
@@ -9641,35 +8507,63 @@ class h3d_mat_Pass {
 		return this.depthWrite = v;
 	}
 	set_depthTest(v) {
-		this.bits = this.bits & -57 | v._hx_index << 3;
+		this.bits = this.bits & -57 | Type.enumIndex(v) << 3;
 		return this.depthTest = v;
 	}
 	set_blendSrc(v) {
-		this.bits = this.bits & -961 | v._hx_index << 6;
+		this.bits = this.bits & -961 | Type.enumIndex(v) << 6;
 		return this.blendSrc = v;
 	}
 	set_blendDst(v) {
-		this.bits = this.bits & -15361 | v._hx_index << 10;
+		this.bits = this.bits & -15361 | Type.enumIndex(v) << 10;
 		return this.blendDst = v;
 	}
 	set_blendAlphaSrc(v) {
-		this.bits = this.bits & -245761 | v._hx_index << 14;
+		this.bits = this.bits & -245761 | Type.enumIndex(v) << 14;
 		return this.blendAlphaSrc = v;
 	}
 	set_blendAlphaDst(v) {
-		this.bits = this.bits & -3932161 | v._hx_index << 18;
+		this.bits = this.bits & -3932161 | Type.enumIndex(v) << 18;
 		return this.blendAlphaDst = v;
 	}
 	set_blendOp(v) {
-		this.bits = this.bits & -29360129 | v._hx_index << 22;
+		this.bits = this.bits & -29360129 | Type.enumIndex(v) << 22;
 		return this.blendOp = v;
 	}
 	set_blendAlphaOp(v) {
-		this.bits = this.bits & -234881025 | v._hx_index << 25;
+		this.bits = this.bits & -234881025 | Type.enumIndex(v) << 25;
 		return this.blendAlphaOp = v;
+	}
+	static getCulling(v) {
+		return v & 3;
+	}
+	static getDepthWrite(v) {
+		return v >> 2 & 1;
+	}
+	static getDepthTest(v) {
+		return v >> 3 & 7;
+	}
+	static getBlendSrc(v) {
+		return v >> 6 & 15;
+	}
+	static getBlendDst(v) {
+		return v >> 10 & 15;
+	}
+	static getBlendAlphaSrc(v) {
+		return v >> 14 & 15;
+	}
+	static getBlendAlphaDst(v) {
+		return v >> 18 & 15;
+	}
+	static getBlendOp(v) {
+		return v >> 22 & 7;
+	}
+	static getBlendAlphaOp(v) {
+		return v >> 25 & 7;
 	}
 }
 h3d_mat_Pass.__name__ = "h3d.mat.Pass";
+h3d_mat_Pass.__interfaces__ = [hxd_impl__$Serializable_NoSerializeSupport];
 Object.assign(h3d_mat_Pass.prototype, {
 	__class__: h3d_mat_Pass
 });
@@ -9722,45 +8616,88 @@ class h3d_mat_Stencil {
 		return this.reference = v;
 	}
 	set_frontTest(v) {
-		this.opBits = this.opBits & -8 | v._hx_index;
+		this.opBits = this.opBits & -8 | Type.enumIndex(v);
 		return this.frontTest = v;
 	}
 	set_frontPass(v) {
-		this.opBits = this.opBits & -57 | v._hx_index << 3;
+		this.opBits = this.opBits & -57 | Type.enumIndex(v) << 3;
 		return this.frontPass = v;
 	}
 	set_frontSTfail(v) {
-		this.opBits = this.opBits & -449 | v._hx_index << 6;
+		this.opBits = this.opBits & -449 | Type.enumIndex(v) << 6;
 		return this.frontSTfail = v;
 	}
 	set_frontDPfail(v) {
-		this.opBits = this.opBits & -3585 | v._hx_index << 9;
+		this.opBits = this.opBits & -3585 | Type.enumIndex(v) << 9;
 		return this.frontDPfail = v;
 	}
 	set_backTest(v) {
-		this.opBits = this.opBits & -28673 | v._hx_index << 12;
+		this.opBits = this.opBits & -28673 | Type.enumIndex(v) << 12;
 		return this.backTest = v;
 	}
 	set_backPass(v) {
-		this.opBits = this.opBits & -229377 | v._hx_index << 15;
+		this.opBits = this.opBits & -229377 | Type.enumIndex(v) << 15;
 		return this.backPass = v;
 	}
 	set_backSTfail(v) {
-		this.opBits = this.opBits & -1835009 | v._hx_index << 18;
+		this.opBits = this.opBits & -1835009 | Type.enumIndex(v) << 18;
 		return this.backSTfail = v;
 	}
 	set_backDPfail(v) {
-		this.opBits = this.opBits & -14680065 | v._hx_index << 21;
+		this.opBits = this.opBits & -14680065 | Type.enumIndex(v) << 21;
 		return this.backDPfail = v;
+	}
+	static getReadMask(v) {
+		return v & 255;
+	}
+	static getWriteMask(v) {
+		return v >> 8 & 255;
+	}
+	static getReference(v) {
+		return v >> 16 & 255;
+	}
+	static getFrontTest(v) {
+		return v & 7;
+	}
+	static getFrontPass(v) {
+		return v >> 3 & 7;
+	}
+	static getFrontSTfail(v) {
+		return v >> 6 & 7;
+	}
+	static getFrontDPfail(v) {
+		return v >> 9 & 7;
+	}
+	static getBackTest(v) {
+		return v >> 12 & 7;
+	}
+	static getBackPass(v) {
+		return v >> 15 & 7;
+	}
+	static getBackSTfail(v) {
+		return v >> 18 & 7;
+	}
+	static getBackDPfail(v) {
+		return v >> 21 & 7;
 	}
 }
 h3d_mat_Stencil.__name__ = "h3d.mat.Stencil";
+h3d_mat_Stencil.__interfaces__ = [hxd_impl__$Serializable_NoSerializeSupport];
 Object.assign(h3d_mat_Stencil.prototype, {
 	__class__: h3d_mat_Stencil
 });
 class haxe_ds_IntMap {
 	constructor() {
 		this.h = { };
+	}
+	set(key,value) {
+		this.h[key] = value;
+	}
+	get(key) {
+		return this.h[key];
+	}
+	exists(key) {
+		return this.h.hasOwnProperty(key);
 	}
 	remove(key) {
 		if(!this.h.hasOwnProperty(key)) {
@@ -9784,6 +8721,7 @@ class haxe_ds_IntMap {
 	}
 }
 haxe_ds_IntMap.__name__ = "haxe.ds.IntMap";
+haxe_ds_IntMap.__interfaces__ = [haxe_IMap];
 Object.assign(haxe_ds_IntMap.prototype, {
 	__class__: haxe_ds_IntMap
 });
@@ -9811,7 +8749,7 @@ var hxd_PixelFormat = $hxEnums["hxd.PixelFormat"] = { __ename__ : true, __constr
 hxd_PixelFormat.__empty_constructs__ = [hxd_PixelFormat.ARGB,hxd_PixelFormat.BGRA,hxd_PixelFormat.RGBA,hxd_PixelFormat.RGBA16F,hxd_PixelFormat.RGBA32F,hxd_PixelFormat.R8,hxd_PixelFormat.R16F,hxd_PixelFormat.R32F,hxd_PixelFormat.RG8,hxd_PixelFormat.RG16F,hxd_PixelFormat.RG32F,hxd_PixelFormat.RGB8,hxd_PixelFormat.RGB16F,hxd_PixelFormat.RGB32F,hxd_PixelFormat.SRGB,hxd_PixelFormat.SRGB_ALPHA,hxd_PixelFormat.RGB10A2,hxd_PixelFormat.RG11B10UF];
 class h3d_mat_Texture {
 	constructor(w,h,flags,format) {
-		let engine = h3d_Engine.CURRENT;
+		let engine = h3d_Engine.getCurrent();
 		this.mem = engine.mem;
 		if(format == null) {
 			format = h3d_mat_Texture.nativeFormat;
@@ -9824,7 +8762,7 @@ class h3d_mat_Texture {
 			while(_g < flags.length) {
 				let f = flags[_g];
 				++_g;
-				this.flags |= 1 << f._hx_index;
+				this.flags |= 1 << Type.enumIndex(f);
 			}
 		}
 		let tw = 1;
@@ -9880,16 +8818,23 @@ class h3d_mat_Texture {
 		this.name = n;
 	}
 	set_mipMap(m) {
-		this.bits = this.bits & -4 | m._hx_index;
+		this.bits = this.bits & -4 | Type.enumIndex(m);
 		return this.mipMap = m;
 	}
 	set_filter(f) {
-		this.bits = this.bits & -25 | f._hx_index << 3;
+		this.bits = this.bits & -25 | Type.enumIndex(f) << 3;
 		return this.filter = f;
 	}
 	set_wrap(w) {
-		this.bits = this.bits & -193 | w._hx_index << 6;
+		this.bits = this.bits & -193 | Type.enumIndex(w) << 6;
 		return this.wrap = w;
+	}
+	isDisposed() {
+		if(this.t == null) {
+			return this.realloc == null;
+		} else {
+			return false;
+		}
 	}
 	clear(color,alpha,layer) {
 		if(layer == null) {
@@ -9900,8 +8845,8 @@ class h3d_mat_Texture {
 		}
 		this.alloc();
 		if(this.width != 1 || this.height != 1) {
-			let engine = h3d_Engine.CURRENT;
-			color |= ((alpha < 0. ? 0. : alpha > 1. ? 1. : alpha) * 255 | 0) << 24;
+			let engine = h3d_Engine.getCurrent();
+			color |= Std.int(hxd_Math.clamp(alpha) * 255) << 24;
 			if(layer < 0) {
 				let _g = 0;
 				let _g1 = this.get_layerCount();
@@ -9922,7 +8867,7 @@ class h3d_mat_Texture {
 			let b = color & 255;
 			let g = color >> 8 & 255;
 			let r = color >> 16 & 255;
-			let a = alpha * 255 | 0;
+			let a = Std.int(alpha * 255);
 			if(a < 0) {
 				a = 0;
 			} else if(a > 255) {
@@ -9943,10 +8888,10 @@ class h3d_mat_Texture {
 			let _g1 = this.width * this.height;
 			while(_g < _g1) {
 				++_g;
-				p.bytes.b[k++] = r;
-				p.bytes.b[k++] = g;
-				p.bytes.b[k++] = b;
-				p.bytes.b[k++] = a;
+				p.bytes.set(k++,r);
+				p.bytes.set(k++,g);
+				p.bytes.set(k++,b);
+				p.bytes.set(k++,a);
 			}
 			if(layer < 0) {
 				let _g = 0;
@@ -9959,6 +8904,11 @@ class h3d_mat_Texture {
 				this.uploadPixels(p,0,layer);
 			}
 			p.dispose();
+		}
+	}
+	checkSize(width,height,mip) {
+		if(width != this.width >> mip || height != this.height >> mip) {
+			throw haxe_Exception.thrown("Invalid upload size : " + width + "x" + height + " should be " + (this.width >> mip) + "x" + (this.height >> mip));
 		}
 	}
 	checkMipMapGen(mipLevel,layer) {
@@ -9974,11 +8924,7 @@ class h3d_mat_Texture {
 			mipLevel = 0;
 		}
 		this.alloc();
-		let width = pixels.width;
-		let height = pixels.height;
-		if(width != this.width >> mipLevel || height != this.height >> mipLevel) {
-			throw haxe_Exception.thrown("Invalid upload size : " + width + "x" + height + " should be " + (this.width >> mipLevel) + "x" + (this.height >> mipLevel));
-		}
+		this.checkSize(pixels.width,pixels.height,mipLevel);
 		this.mem.driver.uploadTexturePixels(this,pixels,mipLevel,layer);
 		this.flags |= 256;
 		this.checkMipMapGen(mipLevel,layer);
@@ -9992,15 +8938,15 @@ class h3d_mat_Texture {
 		if(alpha == null) {
 			alpha = 1.;
 		}
-		let engine = h3d_Engine.CURRENT;
-		let aval = alpha * 255 | 0;
+		let engine = h3d_Engine.getCurrent();
+		let aval = Std.int(alpha * 255);
 		if(aval < 0) {
 			aval = 0;
 		} else if(aval > 255) {
 			aval = 255;
 		}
 		let key = color & 16777215 | aval << 24;
-		let t = engine.textureColorCache.h[key];
+		let t = engine.textureColorCache.get(key);
 		if(t != null) {
 			return t;
 		}
@@ -10009,12 +8955,12 @@ class h3d_mat_Texture {
 		t1.realloc = function() {
 			t1.clear(color,alpha);
 		};
-		engine.textureColorCache.h[key] = t1;
+		engine.textureColorCache.set(key,t1);
 		return t1;
 	}
 	static defaultCubeTexture() {
-		let engine = h3d_Engine.CURRENT;
-		let t = engine.resCache.h[h3d_mat_Texture.__id__];
+		let engine = h3d_Engine.getCurrent();
+		let t = engine.resCache.get(h3d_mat_Texture);
 		if(t != null) {
 			return t;
 		}
@@ -10068,7 +9014,7 @@ class h3d_pass_ScreenFx {
 	}
 	get_engine() {
 		if(this._engine == null) {
-			this._engine = h3d_Engine.CURRENT;
+			this._engine = h3d_Engine.getCurrent();
 		}
 		return this._engine;
 	}
@@ -10076,16 +9022,14 @@ class h3d_pass_ScreenFx {
 		if(this.primitive == null) {
 			this.primitive = h3d_prim_Plane2D.get();
 		}
-		this.shader.flipY__ = this.get_engine().driver.hasFeature(h3d_impl_Feature.BottomLeftCoords) && this.get_engine().getCurrentTarget() != null ? -1 : 1;
+		this.shader.set_flipY(this.get_engine().driver.hasFeature(h3d_impl_Feature.BottomLeftCoords) && this.get_engine().getCurrentTarget() != null ? -1 : 1);
 		let rts = this.manager.compileShaders(this.shaders);
 		this.get_engine().selectMaterial(this.pass);
 		this.get_engine().selectShader(rts);
 		if(this.buffers == null) {
 			this.buffers = new h3d_shader_Buffers(rts);
 		} else {
-			let _this = this.buffers;
-			_this.vertex.grow(rts.vertex);
-			_this.fragment.grow(rts.fragment);
+			this.buffers.grow(rts);
 		}
 		this.manager.fillGlobals(this.buffers,rts);
 		this.manager.fillParams(this.buffers,rts,this.shaders);
@@ -10172,15 +9116,8 @@ class h3d_pass_Blur extends h3d_pass_ScreenFx {
 		this.values = [];
 		this.offsets = [];
 		let tot = 0.;
-		let f = this.quality;
-		let qadj = (f < 0. ? 0. : f > 1. ? 1. : f) * 0.7 + 0.3;
-		let width;
-		if(this.radius > 0) {
-			let a = this.radius - 1;
-			width = Math.ceil((a < 1 ? 1 : a) * qadj / 2);
-		} else {
-			width = 0;
-		}
+		let qadj = hxd_Math.clamp(this.quality) * 0.7 + 0.3;
+		let width = this.radius > 0 ? Math.ceil(hxd_Math.max(this.radius - 1,1) * qadj / 2) : 0;
 		let sigma = Math.sqrt(this.radius);
 		let _g = 0;
 		let _g1 = width + 1;
@@ -10220,15 +9157,13 @@ class h3d_pass_Blur extends h3d_pass_ScreenFx {
 			let _g1 = this.values.length;
 			while(_g < _g1) {
 				let i = _g++;
-				let a = this.values[i];
-				this.values[i] = a + this.linear * (m - a);
-				let a1 = this.offsets[i];
-				this.offsets[i] = a1 + this.linear * ((i == 0 ? 0 : (i * 2 - 0.5) / (i * qadj)) - a1);
+				this.values[i] = hxd_Math.lerp(this.values[i],m,this.linear);
+				this.offsets[i] = hxd_Math.lerp(this.offsets[i],i == 0 ? 0 : (i * 2 - 0.5) / (i * qadj),this.linear);
 			}
 		}
 	}
 	apply(ctx,src,output) {
-		if(this.radius <= 0 && this.shader.fixedColor__ == null) {
+		if(this.radius <= 0 && this.shader.get_fixedColor() == null) {
 			if(output != null) {
 				h3d_pass_Copy.run(src,output);
 			}
@@ -10243,56 +9178,34 @@ class h3d_pass_Blur extends h3d_pass_ScreenFx {
 		let isCube = (src.flags & 2) != 0;
 		let faceCount = isCube ? 6 : 1;
 		let tmp = ctx.textures.allocTarget(src.name + "BlurTmp",src.width,src.height,false,src.format,isCube);
-		let _this = this.shader;
-		_this.constModified = true;
-		_this.Quality__ = this.values.length;
-		this.shader.values__ = this.values;
-		this.shader.offsets__ = this.offsets;
+		this.shader.set_Quality(this.values.length);
+		this.shader.set_values(this.values);
+		this.shader.set_offsets(this.offsets);
 		if(isCube) {
-			this.shader.cubeTexture__ = src;
-			let _this = this.shader;
-			_this.constModified = true;
-			_this.isCube__ = true;
+			this.shader.set_cubeTexture(src);
+			this.shader.set_isCube(true);
 		} else {
-			this.shader.texture__ = src;
-			let _this = this.shader;
-			_this.constModified = true;
-			_this.isCube__ = false;
+			this.shader.set_texture(src);
+			this.shader.set_isCube(false);
 		}
-		let _this1 = this.shader.pixel__;
-		let x = 1 / src.width;
-		if(x == null) {
-			x = 0.;
-		}
-		_this1.x = x;
-		_this1.y = 0;
-		_this1.z = 0.;
-		_this1.w = 1.;
+		this.shader.get_pixel().set(1 / src.width,0);
 		let _g = 0;
 		let _g1 = faceCount;
 		while(_g < _g1) {
 			let i = _g++;
 			this.get_engine().pushTarget(tmp,i);
 			if(isCube) {
-				this.shader.cubeDir__ = this.cubeDir[i];
+				this.shader.set_cubeDir(this.cubeDir[i]);
 			}
 			this.render();
 			this.get_engine().popTarget();
 		}
 		if(isCube) {
-			this.shader.cubeTexture__ = tmp;
+			this.shader.set_cubeTexture(tmp);
 		} else {
-			this.shader.texture__ = tmp;
+			this.shader.set_texture(tmp);
 		}
-		let _this2 = this.shader.pixel__;
-		let y = 1 / src.height;
-		if(y == null) {
-			y = 0.;
-		}
-		_this2.x = 0;
-		_this2.y = y;
-		_this2.z = 0.;
-		_this2.w = 1.;
+		this.shader.get_pixel().set(0,1 / src.height);
 		let outDepth = output.depthBuffer;
 		output.depthBuffer = null;
 		let _g2 = 0;
@@ -10301,7 +9214,7 @@ class h3d_pass_Blur extends h3d_pass_ScreenFx {
 			let i = _g2++;
 			this.get_engine().pushTarget(output,i);
 			if(isCube) {
-				this.shader.cubeDir__ = this.cubeDir[i];
+				this.shader.set_cubeDir(this.cubeDir[i]);
 			}
 			this.render();
 			this.get_engine().popTarget();
@@ -10330,13 +9243,13 @@ class hxsl_Shader {
 		if(this.shader != null) {
 			return;
 		}
-		let cl = js_Boot.getClass(this);
+		let cl = Type.getClass(this);
 		this.shader = cl._SHADER;
 		if(this.shader == null) {
 			let curClass = cl;
-			while(curClass != null && curClass.SRC == null) curClass = curClass.__super__;
+			while(curClass != null && curClass.SRC == null) curClass = Type.getSuperClass(curClass);
 			if(curClass == null) {
-				throw haxe_Exception.thrown(cl.__name__ + " has no shader source");
+				throw haxe_Exception.thrown(Type.getClassName(cl) + " has no shader source");
 			}
 			this.shader = curClass._SHADER;
 			if(this.shader == null) {
@@ -10364,7 +9277,7 @@ class hxsl_Shader {
 				c = c.next;
 				continue;
 			}
-			let v = globals.map.h[c.globalId];
+			let v = globals.fastGet(c.globalId);
 			let _g = c.v.type;
 			switch(_g._hx_index) {
 			case 1:
@@ -10392,14 +9305,14 @@ class hxsl_Shader {
 				} else if(sel == null || sel == hxsl_Channel.Unknown) {
 					switch(_g.size) {
 					case 1:
-						if(v3.texture.format == h3d_mat_Texture.nativeFormat) {
+						if(hxsl_ChannelTools.isPackedFormat(v3.texture)) {
 							sel = hxsl_Channel.PackedFloat;
 						} else {
 							throw haxe_Exception.thrown("Constant " + c.v.name + " does not define channel select value");
 						}
 						break;
 					case 3:
-						if(v3.texture.format == h3d_mat_Texture.nativeFormat) {
+						if(hxsl_ChannelTools.isPackedFormat(v3.texture)) {
 							sel = hxsl_Channel.PackedNormal;
 						} else {
 							throw haxe_Exception.thrown("Constant " + c.v.name + " does not define channel select value");
@@ -10409,21 +9322,17 @@ class hxsl_Shader {
 						throw haxe_Exception.thrown("Constant " + c.v.name + " does not define channel select value");
 					}
 				}
-				this.constBits |= (globals.allocChannelID(v3.texture) << 3 | sel._hx_index) << c.pos;
+				this.constBits |= (globals.allocChannelID(v3.texture) << 3 | Type.enumIndex(sel)) << c.pos;
 				break;
 			default:
 				throw haxe_Exception.thrown("assert");
 			}
 			c = c.next;
 		}
-		let _this = this.shader;
-		let constBits = this.constBits;
-		let i = _this.instanceCache.h[constBits];
-		this.instance = i == null ? _this.makeInstance(constBits) : i;
+		this.instance = this.shader.getInstance(this.constBits);
 	}
 	toString() {
-		let c = js_Boot.getClass(this);
-		return c.__name__;
+		return Type.getClassName(Type.getClass(this));
 	}
 }
 hxsl_Shader.__name__ = "hxsl.Shader";
@@ -10444,6 +9353,9 @@ class h3d_shader_ScreenShader extends hxsl_Shader {
 	_hx_constructor() {
 		this.flipY__ = 0;
 		super._hx_constructor();
+	}
+	set_flipY(_v) {
+		return this.flipY__ = _v;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -10477,6 +9389,9 @@ class h3d_pass__$Border_BorderShader extends h3d_shader_ScreenShader {
 	_hx_constructor() {
 		this.color__ = new h3d_Vector();
 		super._hx_constructor();
+	}
+	get_color() {
+		return this.color__;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -10833,11 +9748,7 @@ class h3d_pass_Border extends h3d_pass_ScreenFx {
 		}
 		bbuf.array[bbuf.pos++] = 1 - height / height * 2;
 		this.primitive = new h3d_prim_RawPrimitive({ vbuf : bbuf, stride : 2, quads : true},true);
-		let _this = this.shader.color__;
-		_this.x = 1;
-		_this.y = 1;
-		_this.z = 1;
-		_this.w = 1;
+		this.shader.get_color().set(1,1,1,1);
 	}
 	dispose() {
 		super.dispose();
@@ -10852,6 +9763,9 @@ Object.assign(h3d_pass_Border.prototype, {
 class h3d_pass__$Copy_CopyShader extends h3d_shader_ScreenShader {
 	constructor() {
 		super();
+	}
+	set_texture(_v) {
+		return this.texture__ = _v;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -10887,7 +9801,7 @@ class h3d_pass_Copy extends h3d_pass_ScreenFx {
 		if(to != null) {
 			this.get_engine().pushTarget(to,layer != null ? layer : 0);
 		}
-		this.shader.texture__ = from;
+		this.shader.set_texture(from);
 		if(customPass != null) {
 			let old = this.pass;
 			this.pass = customPass;
@@ -10904,17 +9818,17 @@ class h3d_pass_Copy extends h3d_pass_ScreenFx {
 			this.pass.setBlendMode(blend == null ? h2d_BlendMode.None : blend);
 			this.render();
 		}
-		this.shader.texture__ = null;
+		this.shader.set_texture(null);
 		if(to != null) {
 			this.get_engine().popTarget();
 		}
 	}
 	static run(from,to,blend,pass) {
-		let engine = h3d_Engine.CURRENT;
+		let engine = h3d_Engine.getCurrent();
 		if(to != null && from != null && (blend == null || blend == h2d_BlendMode.None) && pass == null && engine.driver.copyTexture(from,to)) {
 			return;
 		}
-		let inst = engine.resCache.h[h3d_pass_Copy.__id__];
+		let inst = engine.resCache.get(h3d_pass_Copy);
 		if(inst == null) {
 			inst = new h3d_pass_Copy();
 			engine.resCache.set(h3d_pass_Copy,inst);
@@ -10983,6 +9897,9 @@ class h3d_pass_Default extends h3d_pass_Base {
 		this.manager = new h3d_pass_ShaderManager(this.getOutputs());
 		this.initGlobals();
 	}
+	get_globals() {
+		return this.manager.globals;
+	}
 	getOutputs() {
 		return [hxsl_Output.Value("output.color")];
 	}
@@ -10996,41 +9913,26 @@ class h3d_pass_Default extends h3d_pass_Base {
 	}
 	setupShaders(passes) {
 		let lightInit = false;
-		let _g_o = passes.current;
-		while(_g_o != null) {
-			let tmp = _g_o;
-			_g_o = _g_o.next;
-			let shaders = tmp.pass.getShadersRec();
-			shaders = this.processShaders(tmp,shaders);
-			if(tmp.pass.enableLights && this.ctx.lightSystem != null) {
+		let p = passes.iterator();
+		while(p.hasNext()) {
+			let p1 = p.next();
+			let shaders = p1.pass.getShadersRec();
+			shaders = this.processShaders(p1,shaders);
+			if(p1.pass.enableLights && this.ctx.lightSystem != null) {
 				if(!lightInit) {
-					this.ctx.lightSystem.initGlobals(this.manager.globals);
+					this.ctx.lightSystem.initGlobals(this.get_globals());
 					lightInit = true;
 				}
-				shaders = this.ctx.lightSystem.computeLight(tmp.obj,shaders);
+				shaders = this.ctx.lightSystem.computeLight(p1.obj,shaders);
 			}
-			tmp.shader = this.manager.compileShaders(shaders,tmp.pass.batchMode);
-			tmp.shaders = shaders;
-			let t = tmp.shader.fragment.textures;
+			p1.shader = this.manager.compileShaders(shaders,p1.pass.batchMode);
+			p1.shaders = shaders;
+			let t = p1.shader.fragment.textures;
 			if(t == null) {
-				tmp.texture = 0;
+				p1.texture = 0;
 			} else {
-				let _this = this.manager;
-				let t1;
-				if(t.perObjectGlobal != null) {
-					let v = _this.globals.map.h[t.perObjectGlobal.gid];
-					if(v == null) {
-						throw haxe_Exception.thrown("Missing global value " + t.perObjectGlobal.path + " for shader " + _this.shaderInfo(shaders,t.perObjectGlobal.path));
-					}
-					t1 = t.type._hx_index == 17 ? v.texture : v;
-				} else {
-					let si = shaders;
-					let n = t.instance;
-					while(--n > 0) si = si.next;
-					let v = si.s.getParamValue(t.index);
-					t1 = v;
-				}
-				tmp.texture = t1 == null ? 0 : t1.id;
+				let t1 = this.manager.getParamValue(t,shaders,true);
+				p1.texture = t1 == null ? 0 : t1.id;
 			}
 		}
 	}
@@ -11040,7 +9942,7 @@ class h3d_pass_Default extends h3d_pass_Base {
 		p.obj.draw(this.ctx);
 	}
 	draw(passes,sort) {
-		if(passes.current == null) {
+		if(passes.isEmpty()) {
 			return;
 		}
 		let _g = 0;
@@ -11048,7 +9950,7 @@ class h3d_pass_Default extends h3d_pass_Base {
 		while(_g < _g1.length) {
 			let g = _g1[_g];
 			++_g;
-			this.manager.globals.map.h[g.gid] = g.value;
+			this.get_globals().fastSet(g.gid,g.value);
 		}
 		this.setGlobals();
 		this.setupShaders(passes);
@@ -11060,40 +9962,98 @@ class h3d_pass_Default extends h3d_pass_Base {
 		this.ctx.currentManager = this.manager;
 		let buf = this.ctx.shaderBuffers;
 		let prevShader = null;
-		let _g2_o = passes.current;
-		while(_g2_o != null) {
-			let tmp = _g2_o;
-			_g2_o = _g2_o.next;
-			let v = tmp.obj.absPos;
-			this.manager.globals.map.h[this.globalModelView_id] = v;
-			if(tmp.shader.globals.h.hasOwnProperty(this.globalModelViewInverse_id)) {
-				let v = tmp.obj.getInvPos();
-				this.manager.globals.map.h[this.globalModelViewInverse_id] = v;
+		let p = passes.iterator();
+		while(p.hasNext()) {
+			let p1 = p.next();
+			this.set_globalModelView(p1.obj.absPos);
+			if(p1.shader.hasGlobal(this.globalModelViewInverse_id)) {
+				this.set_globalModelViewInverse(p1.obj.getInvPos());
 			}
-			if(prevShader != tmp.shader) {
-				prevShader = tmp.shader;
-				this.ctx.engine.selectShader(tmp.shader);
+			if(prevShader != p1.shader) {
+				prevShader = p1.shader;
+				this.ctx.engine.selectShader(p1.shader);
 				if(buf == null) {
-					buf = this.ctx.shaderBuffers = new h3d_shader_Buffers(tmp.shader);
+					buf = this.ctx.shaderBuffers = new h3d_shader_Buffers(p1.shader);
 				} else {
-					let s = tmp.shader;
-					buf.vertex.grow(s.vertex);
-					buf.fragment.grow(s.fragment);
+					buf.grow(p1.shader);
 				}
-				this.manager.fillGlobals(buf,tmp.shader);
+				this.manager.fillGlobals(buf,p1.shader);
 				this.ctx.engine.uploadShaderBuffers(buf,0);
 			}
-			if(!tmp.pass.dynamicParameters) {
-				this.manager.fillParams(buf,tmp.shader,tmp.shaders);
+			if(!p1.pass.dynamicParameters) {
+				this.manager.fillParams(buf,p1.shader,p1.shaders);
 				this.ctx.engine.uploadShaderBuffers(buf,1);
 				this.ctx.engine.uploadShaderBuffers(buf,2);
 				this.ctx.engine.uploadShaderBuffers(buf,3);
 			}
-			this.drawObject(tmp);
+			this.drawObject(p1);
 		}
-		let _this = this.ctx;
-		_this.cachedPos = 0;
-		_this.drawPass = null;
+		this.ctx.nextPass();
+	}
+	set_cameraView(v) {
+		let this1 = this.cameraView_id;
+		this.get_globals().fastSet(this1,v);
+		return v;
+	}
+	set_cameraNear(v) {
+		let this1 = this.cameraNear_id;
+		this.get_globals().fastSet(this1,v);
+		return v;
+	}
+	set_cameraFar(v) {
+		let this1 = this.cameraFar_id;
+		this.get_globals().fastSet(this1,v);
+		return v;
+	}
+	set_cameraProj(v) {
+		let this1 = this.cameraProj_id;
+		this.get_globals().fastSet(this1,v);
+		return v;
+	}
+	set_cameraPos(v) {
+		let this1 = this.cameraPos_id;
+		this.get_globals().fastSet(this1,v);
+		return v;
+	}
+	set_cameraProjDiag(v) {
+		let this1 = this.cameraProjDiag_id;
+		this.get_globals().fastSet(this1,v);
+		return v;
+	}
+	set_cameraProjFlip(v) {
+		let this1 = this.cameraProjFlip_id;
+		this.get_globals().fastSet(this1,v);
+		return v;
+	}
+	set_cameraViewProj(v) {
+		let this1 = this.cameraViewProj_id;
+		this.get_globals().fastSet(this1,v);
+		return v;
+	}
+	set_cameraInverseViewProj(v) {
+		let this1 = this.cameraInverseViewProj_id;
+		this.get_globals().fastSet(this1,v);
+		return v;
+	}
+	set_globalTime(v) {
+		let this1 = this.globalTime_id;
+		this.get_globals().fastSet(this1,v);
+		return v;
+	}
+	set_pixelSize(v) {
+		let this1 = this.pixelSize_id;
+		this.get_globals().fastSet(this1,v);
+		return v;
+	}
+	set_globalModelView(v) {
+		let this1 = this.globalModelView_id;
+		this.get_globals().fastSet(this1,v);
+		return v;
+	}
+	set_globalModelViewInverse(v) {
+		let this1 = this.globalModelViewInverse_id;
+		this.get_globals().fastSet(this1,v);
+		return v;
 	}
 	initGlobals() {
 		let this1 = hxsl_Globals.allocID("camera.view");
@@ -11124,28 +10084,17 @@ class h3d_pass_Default extends h3d_pass_Base {
 		this.globalModelViewInverse_id = this13;
 	}
 	setGlobals() {
-		let v = this.ctx.camera.mcam;
-		this.manager.globals.map.h[this.cameraView_id] = v;
-		let v1 = this.ctx.camera.zNear;
-		this.manager.globals.map.h[this.cameraNear_id] = v1;
-		let v2 = this.ctx.camera.zFar;
-		this.manager.globals.map.h[this.cameraFar_id] = v2;
-		let v3 = this.ctx.camera.mproj;
-		this.manager.globals.map.h[this.cameraProj_id] = v3;
-		let v4 = this.ctx.camera.pos;
-		this.manager.globals.map.h[this.cameraPos_id] = v4;
-		let v5 = new h3d_Vector(this.ctx.camera.mproj._11,this.ctx.camera.mproj._22,this.ctx.camera.mproj._33,this.ctx.camera.mproj._44);
-		this.manager.globals.map.h[this.cameraProjDiag_id] = v5;
-		let v6 = this.ctx.engine.driver.hasFeature(h3d_impl_Feature.BottomLeftCoords) && this.ctx.engine.getCurrentTarget() != null ? -1 : 1;
-		this.manager.globals.map.h[this.cameraProjFlip_id] = v6;
-		let v7 = this.ctx.camera.m;
-		this.manager.globals.map.h[this.cameraViewProj_id] = v7;
-		let v8 = this.ctx.camera.getInverseViewProj();
-		this.manager.globals.map.h[this.cameraInverseViewProj_id] = v8;
-		let v9 = this.ctx.time;
-		this.manager.globals.map.h[this.globalTime_id] = v9;
-		let v10 = new h3d_Vector(2 / this.ctx.engine.width,2 / this.ctx.engine.height);
-		this.manager.globals.map.h[this.pixelSize_id] = v10;
+		this.set_cameraView(this.ctx.camera.mcam);
+		this.set_cameraNear(this.ctx.camera.zNear);
+		this.set_cameraFar(this.ctx.camera.zFar);
+		this.set_cameraProj(this.ctx.camera.mproj);
+		this.set_cameraPos(this.ctx.camera.pos);
+		this.set_cameraProjDiag(new h3d_Vector(this.ctx.camera.mproj._11,this.ctx.camera.mproj._22,this.ctx.camera.mproj._33,this.ctx.camera.mproj._44));
+		this.set_cameraProjFlip(this.ctx.engine.driver.hasFeature(h3d_impl_Feature.BottomLeftCoords) && this.ctx.engine.getCurrentTarget() != null ? -1 : 1);
+		this.set_cameraViewProj(this.ctx.camera.m);
+		this.set_cameraInverseViewProj(this.ctx.camera.getInverseViewProj());
+		this.set_globalTime(this.ctx.time);
+		this.set_pixelSize(new h3d_Vector(2 / this.ctx.engine.width,2 / this.ctx.engine.height));
 	}
 }
 h3d_pass_Default.__name__ = "h3d.pass.Default";
@@ -11176,16 +10125,14 @@ class h3d_pass_Shadows extends h3d_pass_Default {
 		if(this.format == null) {
 			this.format = hxd_PixelFormat.R16F;
 		}
-		if(!h3d_Engine.CURRENT.driver.isSupportedFormat(this.format)) {
+		if(!h3d_Engine.getCurrent().driver.isSupportedFormat(this.format)) {
 			this.format = h3d_mat_Texture.nativeFormat;
 		}
 		super._hx_constructor("shadow");
 		this.light = light;
 		this.blur = new h3d_pass_Blur(5);
 		this.blur.set_quality(0.5);
-		let _this = this.blur.shader;
-		_this.constModified = true;
-		_this.isDepth__ = this.format == h3d_mat_Texture.nativeFormat;
+		this.blur.shader.set_isDepth(this.format == h3d_mat_Texture.nativeFormat);
 	}
 	set_size(s) {
 		if(s != this.size && this.staticTexture != null) {
@@ -11217,19 +10164,13 @@ class h3d_pass_Shadows extends h3d_pass_Default {
 	syncShader(texture) {
 	}
 	filterPasses(passes) {
+		let _gthis = this;
 		if(!this.ctx.computingStatic) {
 			switch(this.mode._hx_index) {
 			case 0:
 				return false;
 			case 1:
-				let tmp;
-				if(this.staticTexture != null) {
-					let _this = this.staticTexture;
-					tmp = _this.t == null && _this.realloc == null;
-				} else {
-					tmp = true;
-				}
-				if(tmp) {
+				if(this.staticTexture == null || this.staticTexture.isDisposed()) {
 					this.staticTexture = this.createDefaultShadowMap();
 				}
 				this.syncShader(this.staticTexture);
@@ -11237,14 +10178,7 @@ class h3d_pass_Shadows extends h3d_pass_Default {
 			case 2:
 				break;
 			case 3:
-				let tmp1;
-				if(this.staticTexture != null) {
-					let _this = this.staticTexture;
-					tmp1 = _this.t == null && _this.realloc == null;
-				} else {
-					tmp1 = true;
-				}
-				if(tmp1) {
+				if(this.staticTexture == null || this.staticTexture.isDisposed()) {
 					this.staticTexture = this.createDefaultShadowMap();
 				}
 				break;
@@ -11256,38 +10190,9 @@ class h3d_pass_Shadows extends h3d_pass_Default {
 			break;
 		case 1:
 			if(this.ctx.computingStatic) {
-				let head = null;
-				let prev = null;
-				let disc = passes.discarded;
-				let discQueue = passes.lastDisc;
-				let cur = passes.current;
-				while(cur != null) {
-					if(cur.pass.isStatic == true) {
-						if(head == null) {
-							prev = cur;
-							head = prev;
-						} else {
-							prev.next = cur;
-							prev = cur;
-						}
-					} else if(disc == null) {
-						discQueue = cur;
-						disc = discQueue;
-					} else {
-						discQueue.next = cur;
-						discQueue = cur;
-					}
-					cur = cur.next;
-				}
-				if(prev != null) {
-					prev.next = null;
-				}
-				if(discQueue != null) {
-					discQueue.next = null;
-				}
-				passes.current = head;
-				passes.discarded = disc;
-				passes.lastDisc = discQueue;
+				passes.filter(function(p) {
+					return p.pass.isStatic == true;
+				});
 			} else {
 				passes.clear();
 			}
@@ -11298,41 +10203,27 @@ class h3d_pass_Shadows extends h3d_pass_Default {
 			}
 			break;
 		case 3:
-			let head = null;
-			let prev = null;
-			let disc = passes.discarded;
-			let discQueue = passes.lastDisc;
-			let cur = passes.current;
-			while(cur != null) {
-				if(cur.pass.isStatic == this.ctx.computingStatic) {
-					if(head == null) {
-						prev = cur;
-						head = prev;
-					} else {
-						prev.next = cur;
-						prev = cur;
-					}
-				} else if(disc == null) {
-					discQueue = cur;
-					disc = discQueue;
-				} else {
-					discQueue.next = cur;
-					discQueue = cur;
-				}
-				cur = cur.next;
-			}
-			if(prev != null) {
-				prev.next = null;
-			}
-			if(discQueue != null) {
-				discQueue.next = null;
-			}
-			passes.current = head;
-			passes.discarded = disc;
-			passes.lastDisc = discQueue;
+			passes.filter(function(p) {
+				return p.pass.isStatic == _gthis.ctx.computingStatic;
+			});
 			break;
 		}
 		return true;
+	}
+	cullPasses(passes,f) {
+		let prevCollider = null;
+		let prevResult = true;
+		passes.filter(function(p) {
+			let col = p.obj.cullingCollider;
+			if(col == null) {
+				return true;
+			}
+			if(col != prevCollider) {
+				prevCollider = col;
+				prevResult = f(col);
+			}
+			return prevResult;
+		});
 	}
 }
 h3d_pass_Shadows.__name__ = "h3d.pass.Shadows";
@@ -11358,15 +10249,13 @@ class h3d_pass_DirShadowMap extends h3d_pass_Shadows {
 		this.lightCamera.orthoBounds = new h3d_col_Bounds();
 		this.shader = this.dshader = new h3d_shader_DirShadow();
 		this.border = new h3d_pass_Border(this.size,this.size);
-		this.customDepth = h3d_Engine.CURRENT.driver.hasFeature(h3d_impl_Feature.AllocDepthBuffer);
+		this.customDepth = h3d_Engine.getCurrent().driver.hasFeature(h3d_impl_Feature.AllocDepthBuffer);
 		if(!this.customDepth) {
 			this.depth = h3d_mat_DepthBuffer.getDefault();
 		}
 	}
 	set_mode(m) {
-		let _this = this.dshader;
-		_this.constModified = true;
-		_this.enable__ = m != h3d_pass_RenderMode.None;
+		this.dshader.set_enable(m != h3d_pass_RenderMode.None);
 		return this.mode = m;
 	}
 	set_size(s) {
@@ -11388,318 +10277,30 @@ class h3d_pass_DirShadowMap extends h3d_pass_Shadows {
 				return;
 			}
 			mtmp.multiply3x4(m.getAbsPos(),camera.mcam);
-			let x = b.xMin;
-			let y = b.yMin;
-			let z = b.zMin;
-			if(z == null) {
-				z = 0.;
-			}
-			if(y == null) {
-				y = 0.;
-			}
-			if(x == null) {
-				x = 0.;
-			}
-			let p_x = x;
-			let p_y = y;
-			let p_z = z;
-			let px = p_x * mtmp._11 + p_y * mtmp._21 + p_z * mtmp._31 + mtmp._41;
-			let py = p_x * mtmp._12 + p_y * mtmp._22 + p_z * mtmp._32 + mtmp._42;
-			let pz = p_x * mtmp._13 + p_y * mtmp._23 + p_z * mtmp._33 + mtmp._43;
-			p_x = px;
-			p_y = py;
-			p_z = pz;
-			if(p_x < bounds.xMin) {
-				bounds.xMin = p_x;
-			}
-			if(p_x > bounds.xMax) {
-				bounds.xMax = p_x;
-			}
-			if(p_y < bounds.yMin) {
-				bounds.yMin = p_y;
-			}
-			if(p_y > bounds.yMax) {
-				bounds.yMax = p_y;
-			}
-			if(p_z < bounds.zMin) {
-				bounds.zMin = p_z;
-			}
-			if(p_z > bounds.zMax) {
-				bounds.zMax = p_z;
-			}
-			let x1 = b.xMin;
-			let y1 = b.yMin;
-			let z1 = b.zMax;
-			if(z1 == null) {
-				z1 = 0.;
-			}
-			if(y1 == null) {
-				y1 = 0.;
-			}
-			if(x1 == null) {
-				x1 = 0.;
-			}
-			let p_x1 = x1;
-			let p_y1 = y1;
-			let p_z1 = z1;
-			let px1 = p_x1 * mtmp._11 + p_y1 * mtmp._21 + p_z1 * mtmp._31 + mtmp._41;
-			let py1 = p_x1 * mtmp._12 + p_y1 * mtmp._22 + p_z1 * mtmp._32 + mtmp._42;
-			let pz1 = p_x1 * mtmp._13 + p_y1 * mtmp._23 + p_z1 * mtmp._33 + mtmp._43;
-			p_x1 = px1;
-			p_y1 = py1;
-			p_z1 = pz1;
-			if(p_x1 < bounds.xMin) {
-				bounds.xMin = p_x1;
-			}
-			if(p_x1 > bounds.xMax) {
-				bounds.xMax = p_x1;
-			}
-			if(p_y1 < bounds.yMin) {
-				bounds.yMin = p_y1;
-			}
-			if(p_y1 > bounds.yMax) {
-				bounds.yMax = p_y1;
-			}
-			if(p_z1 < bounds.zMin) {
-				bounds.zMin = p_z1;
-			}
-			if(p_z1 > bounds.zMax) {
-				bounds.zMax = p_z1;
-			}
-			let x2 = b.xMin;
-			let y2 = b.yMax;
-			let z2 = b.zMin;
-			if(z2 == null) {
-				z2 = 0.;
-			}
-			if(y2 == null) {
-				y2 = 0.;
-			}
-			if(x2 == null) {
-				x2 = 0.;
-			}
-			let p_x2 = x2;
-			let p_y2 = y2;
-			let p_z2 = z2;
-			let px2 = p_x2 * mtmp._11 + p_y2 * mtmp._21 + p_z2 * mtmp._31 + mtmp._41;
-			let py2 = p_x2 * mtmp._12 + p_y2 * mtmp._22 + p_z2 * mtmp._32 + mtmp._42;
-			let pz2 = p_x2 * mtmp._13 + p_y2 * mtmp._23 + p_z2 * mtmp._33 + mtmp._43;
-			p_x2 = px2;
-			p_y2 = py2;
-			p_z2 = pz2;
-			if(p_x2 < bounds.xMin) {
-				bounds.xMin = p_x2;
-			}
-			if(p_x2 > bounds.xMax) {
-				bounds.xMax = p_x2;
-			}
-			if(p_y2 < bounds.yMin) {
-				bounds.yMin = p_y2;
-			}
-			if(p_y2 > bounds.yMax) {
-				bounds.yMax = p_y2;
-			}
-			if(p_z2 < bounds.zMin) {
-				bounds.zMin = p_z2;
-			}
-			if(p_z2 > bounds.zMax) {
-				bounds.zMax = p_z2;
-			}
-			let x3 = b.xMin;
-			let y3 = b.yMax;
-			let z3 = b.zMax;
-			if(z3 == null) {
-				z3 = 0.;
-			}
-			if(y3 == null) {
-				y3 = 0.;
-			}
-			if(x3 == null) {
-				x3 = 0.;
-			}
-			let p_x3 = x3;
-			let p_y3 = y3;
-			let p_z3 = z3;
-			let px3 = p_x3 * mtmp._11 + p_y3 * mtmp._21 + p_z3 * mtmp._31 + mtmp._41;
-			let py3 = p_x3 * mtmp._12 + p_y3 * mtmp._22 + p_z3 * mtmp._32 + mtmp._42;
-			let pz3 = p_x3 * mtmp._13 + p_y3 * mtmp._23 + p_z3 * mtmp._33 + mtmp._43;
-			p_x3 = px3;
-			p_y3 = py3;
-			p_z3 = pz3;
-			if(p_x3 < bounds.xMin) {
-				bounds.xMin = p_x3;
-			}
-			if(p_x3 > bounds.xMax) {
-				bounds.xMax = p_x3;
-			}
-			if(p_y3 < bounds.yMin) {
-				bounds.yMin = p_y3;
-			}
-			if(p_y3 > bounds.yMax) {
-				bounds.yMax = p_y3;
-			}
-			if(p_z3 < bounds.zMin) {
-				bounds.zMin = p_z3;
-			}
-			if(p_z3 > bounds.zMax) {
-				bounds.zMax = p_z3;
-			}
-			let x4 = b.xMax;
-			let y4 = b.yMin;
-			let z4 = b.zMin;
-			if(z4 == null) {
-				z4 = 0.;
-			}
-			if(y4 == null) {
-				y4 = 0.;
-			}
-			if(x4 == null) {
-				x4 = 0.;
-			}
-			let p_x4 = x4;
-			let p_y4 = y4;
-			let p_z4 = z4;
-			let px4 = p_x4 * mtmp._11 + p_y4 * mtmp._21 + p_z4 * mtmp._31 + mtmp._41;
-			let py4 = p_x4 * mtmp._12 + p_y4 * mtmp._22 + p_z4 * mtmp._32 + mtmp._42;
-			let pz4 = p_x4 * mtmp._13 + p_y4 * mtmp._23 + p_z4 * mtmp._33 + mtmp._43;
-			p_x4 = px4;
-			p_y4 = py4;
-			p_z4 = pz4;
-			if(p_x4 < bounds.xMin) {
-				bounds.xMin = p_x4;
-			}
-			if(p_x4 > bounds.xMax) {
-				bounds.xMax = p_x4;
-			}
-			if(p_y4 < bounds.yMin) {
-				bounds.yMin = p_y4;
-			}
-			if(p_y4 > bounds.yMax) {
-				bounds.yMax = p_y4;
-			}
-			if(p_z4 < bounds.zMin) {
-				bounds.zMin = p_z4;
-			}
-			if(p_z4 > bounds.zMax) {
-				bounds.zMax = p_z4;
-			}
-			let x5 = b.xMax;
-			let y5 = b.yMin;
-			let z5 = b.zMax;
-			if(z5 == null) {
-				z5 = 0.;
-			}
-			if(y5 == null) {
-				y5 = 0.;
-			}
-			if(x5 == null) {
-				x5 = 0.;
-			}
-			let p_x5 = x5;
-			let p_y5 = y5;
-			let p_z5 = z5;
-			let px5 = p_x5 * mtmp._11 + p_y5 * mtmp._21 + p_z5 * mtmp._31 + mtmp._41;
-			let py5 = p_x5 * mtmp._12 + p_y5 * mtmp._22 + p_z5 * mtmp._32 + mtmp._42;
-			let pz5 = p_x5 * mtmp._13 + p_y5 * mtmp._23 + p_z5 * mtmp._33 + mtmp._43;
-			p_x5 = px5;
-			p_y5 = py5;
-			p_z5 = pz5;
-			if(p_x5 < bounds.xMin) {
-				bounds.xMin = p_x5;
-			}
-			if(p_x5 > bounds.xMax) {
-				bounds.xMax = p_x5;
-			}
-			if(p_y5 < bounds.yMin) {
-				bounds.yMin = p_y5;
-			}
-			if(p_y5 > bounds.yMax) {
-				bounds.yMax = p_y5;
-			}
-			if(p_z5 < bounds.zMin) {
-				bounds.zMin = p_z5;
-			}
-			if(p_z5 > bounds.zMax) {
-				bounds.zMax = p_z5;
-			}
-			let x6 = b.xMax;
-			let y6 = b.yMax;
-			let z6 = b.zMin;
-			if(z6 == null) {
-				z6 = 0.;
-			}
-			if(y6 == null) {
-				y6 = 0.;
-			}
-			if(x6 == null) {
-				x6 = 0.;
-			}
-			let p_x6 = x6;
-			let p_y6 = y6;
-			let p_z6 = z6;
-			let px6 = p_x6 * mtmp._11 + p_y6 * mtmp._21 + p_z6 * mtmp._31 + mtmp._41;
-			let py6 = p_x6 * mtmp._12 + p_y6 * mtmp._22 + p_z6 * mtmp._32 + mtmp._42;
-			let pz6 = p_x6 * mtmp._13 + p_y6 * mtmp._23 + p_z6 * mtmp._33 + mtmp._43;
-			p_x6 = px6;
-			p_y6 = py6;
-			p_z6 = pz6;
-			if(p_x6 < bounds.xMin) {
-				bounds.xMin = p_x6;
-			}
-			if(p_x6 > bounds.xMax) {
-				bounds.xMax = p_x6;
-			}
-			if(p_y6 < bounds.yMin) {
-				bounds.yMin = p_y6;
-			}
-			if(p_y6 > bounds.yMax) {
-				bounds.yMax = p_y6;
-			}
-			if(p_z6 < bounds.zMin) {
-				bounds.zMin = p_z6;
-			}
-			if(p_z6 > bounds.zMax) {
-				bounds.zMax = p_z6;
-			}
-			let x7 = b.xMax;
-			let y7 = b.yMax;
-			let z7 = b.zMax;
-			if(z7 == null) {
-				z7 = 0.;
-			}
-			if(y7 == null) {
-				y7 = 0.;
-			}
-			if(x7 == null) {
-				x7 = 0.;
-			}
-			let p_x7 = x7;
-			let p_y7 = y7;
-			let p_z7 = z7;
-			let px7 = p_x7 * mtmp._11 + p_y7 * mtmp._21 + p_z7 * mtmp._31 + mtmp._41;
-			let py7 = p_x7 * mtmp._12 + p_y7 * mtmp._22 + p_z7 * mtmp._32 + mtmp._42;
-			let pz7 = p_x7 * mtmp._13 + p_y7 * mtmp._23 + p_z7 * mtmp._33 + mtmp._43;
-			p_x7 = px7;
-			p_y7 = py7;
-			p_z7 = pz7;
-			if(p_x7 < bounds.xMin) {
-				bounds.xMin = p_x7;
-			}
-			if(p_x7 > bounds.xMax) {
-				bounds.xMax = p_x7;
-			}
-			if(p_y7 < bounds.yMin) {
-				bounds.yMin = p_y7;
-			}
-			if(p_y7 > bounds.yMax) {
-				bounds.yMax = p_y7;
-			}
-			if(p_z7 < bounds.zMin) {
-				bounds.zMin = p_z7;
-			}
-			if(p_z7 > bounds.zMax) {
-				bounds.zMax = p_z7;
-			}
+			let p = new h3d_col_Point(b.xMin,b.yMin,b.zMin);
+			p.transform(mtmp);
+			bounds.addPoint(p);
+			let p1 = new h3d_col_Point(b.xMin,b.yMin,b.zMax);
+			p1.transform(mtmp);
+			bounds.addPoint(p1);
+			let p2 = new h3d_col_Point(b.xMin,b.yMax,b.zMin);
+			p2.transform(mtmp);
+			bounds.addPoint(p2);
+			let p3 = new h3d_col_Point(b.xMin,b.yMax,b.zMax);
+			p3.transform(mtmp);
+			bounds.addPoint(p3);
+			let p4 = new h3d_col_Point(b.xMax,b.yMin,b.zMin);
+			p4.transform(mtmp);
+			bounds.addPoint(p4);
+			let p5 = new h3d_col_Point(b.xMax,b.yMin,b.zMax);
+			p5.transform(mtmp);
+			bounds.addPoint(p5);
+			let p6 = new h3d_col_Point(b.xMax,b.yMax,b.zMin);
+			p6.transform(mtmp);
+			bounds.addPoint(p6);
+			let p7 = new h3d_col_Point(b.xMax,b.yMax,b.zMax);
+			p7.transform(mtmp);
+			bounds.addPoint(p7);
 		});
 		if(this.mode == h3d_pass_RenderMode.Dynamic) {
 			let cameraBounds = new h3d_col_Bounds();
@@ -11708,36 +10309,8 @@ class h3d_pass_DirShadowMap extends h3d_pass_Shadows {
 			while(_g < _g1.length) {
 				let pt = _g1[_g];
 				++_g;
-				let m = camera.mcam;
-				let px = pt.x * m._11 + pt.y * m._21 + pt.z * m._31 + pt.w * m._41;
-				let py = pt.x * m._12 + pt.y * m._22 + pt.z * m._32 + pt.w * m._42;
-				let pz = pt.x * m._13 + pt.y * m._23 + pt.z * m._33 + pt.w * m._43;
-				let pw = pt.x * m._14 + pt.y * m._24 + pt.z * m._34 + pt.w * m._44;
-				pt.x = px;
-				pt.y = py;
-				pt.z = pz;
-				pt.w = pw;
-				let x = pt.x;
-				let y = pt.y;
-				let z = pt.z;
-				if(x < cameraBounds.xMin) {
-					cameraBounds.xMin = x;
-				}
-				if(x > cameraBounds.xMax) {
-					cameraBounds.xMax = x;
-				}
-				if(y < cameraBounds.yMin) {
-					cameraBounds.yMin = y;
-				}
-				if(y > cameraBounds.yMax) {
-					cameraBounds.yMax = y;
-				}
-				if(z < cameraBounds.zMin) {
-					cameraBounds.zMin = z;
-				}
-				if(z > cameraBounds.zMax) {
-					cameraBounds.zMax = z;
-				}
+				pt.transform(camera.mcam);
+				cameraBounds.addPos(pt.x,pt.y,pt.z);
 			}
 			cameraBounds.zMin = bounds.zMin;
 			bounds.intersection(bounds,cameraBounds);
@@ -11747,53 +10320,24 @@ class h3d_pass_DirShadowMap extends h3d_pass_Shadows {
 	setGlobals() {
 		super.setGlobals();
 		if(this.mode != h3d_pass_RenderMode.Mixed || this.ctx.computingStatic) {
-			let _this = this.lightCamera.orthoBounds;
-			_this.xMin = 1e20;
-			_this.xMax = -1e20;
-			_this.yMin = 1e20;
-			_this.yMax = -1e20;
-			_this.zMin = 1e20;
-			_this.zMax = -1e20;
+			this.lightCamera.orthoBounds.empty();
 			this.calcShadowBounds(this.lightCamera);
 			this.lightCamera.update();
 		}
-		let v = this.getShadowProj();
-		this.manager.globals.map.h[this.cameraViewProj_id] = v;
+		this.set_cameraViewProj(this.getShadowProj());
 	}
 	syncShader(texture) {
-		let _this = this.dshader;
-		_this.constModified = true;
-		_this.shadowMap__ = texture;
-		let _this1 = this.dshader;
-		_this1.constModified = true;
-		_this1.shadowMapChannel__ = this.format == h3d_mat_Texture.nativeFormat ? hxsl_Channel.PackedFloat : hxsl_Channel.R;
-		this.dshader.shadowBias__ = this.bias;
-		this.dshader.shadowPower__ = this.power;
-		this.dshader.shadowProj__ = this.getShadowProj();
-		let _this2 = this.dshader;
-		_this2.constModified = true;
-		_this2.USE_ESM__ = this.samplingKind == h3d_pass_ShadowSamplingKind.ESM;
-		this.dshader.shadowPower__ = this.power;
-		let _this3 = this.dshader;
-		_this3.constModified = true;
-		_this3.USE_PCF__ = this.samplingKind == h3d_pass_ShadowSamplingKind.PCF;
-		let _this4 = this.dshader.shadowRes__;
-		let x = texture.width;
-		let y = texture.height;
-		if(y == null) {
-			y = 0.;
-		}
-		if(x == null) {
-			x = 0.;
-		}
-		_this4.x = x;
-		_this4.y = y;
-		_this4.z = 0.;
-		_this4.w = 1.;
-		this.dshader.pcfScale__ = this.pcfScale;
-		let _this5 = this.dshader;
-		_this5.constModified = true;
-		_this5.pcfQuality__ = this.pcfQuality;
+		this.dshader.set_shadowMap(texture);
+		this.dshader.set_shadowMapChannel(this.format == h3d_mat_Texture.nativeFormat ? hxsl_Channel.PackedFloat : hxsl_Channel.R);
+		this.dshader.set_shadowBias(this.bias);
+		this.dshader.set_shadowPower(this.power);
+		this.dshader.set_shadowProj(this.getShadowProj());
+		this.dshader.set_USE_ESM(this.samplingKind == h3d_pass_ShadowSamplingKind.ESM);
+		this.dshader.set_shadowPower(this.power);
+		this.dshader.set_USE_PCF(this.samplingKind == h3d_pass_ShadowSamplingKind.PCF);
+		this.dshader.get_shadowRes().set(texture.width,texture.height);
+		this.dshader.set_pcfScale(this.pcfScale);
+		this.dshader.set_pcfQuality(this.pcfQuality);
 	}
 	draw(passes,sort) {
 		if(!this.enabled) {
@@ -11803,54 +10347,9 @@ class h3d_pass_DirShadowMap extends h3d_pass_Shadows {
 		if(!this.filterPasses(passes)) {
 			return;
 		}
-		let f = function(col) {
+		this.cullPasses(passes,function(col) {
 			return col.inFrustum(_gthis.lightCamera.frustum);
-		};
-		let prevCollider = null;
-		let prevResult = true;
-		let head = null;
-		let prev = null;
-		let disc = passes.discarded;
-		let discQueue = passes.lastDisc;
-		let cur = passes.current;
-		while(cur != null) {
-			let col = cur.obj.cullingCollider;
-			let tmp;
-			if(col == null) {
-				tmp = true;
-			} else {
-				if(col != prevCollider) {
-					prevCollider = col;
-					prevResult = f(col);
-				}
-				tmp = prevResult;
-			}
-			if(tmp) {
-				if(head == null) {
-					prev = cur;
-					head = prev;
-				} else {
-					prev.next = cur;
-					prev = cur;
-				}
-			} else if(disc == null) {
-				discQueue = cur;
-				disc = discQueue;
-			} else {
-				discQueue.next = cur;
-				discQueue = cur;
-			}
-			cur = cur.next;
-		}
-		if(prev != null) {
-			prev.next = null;
-		}
-		if(discQueue != null) {
-			discQueue.next = null;
-		}
-		passes.current = head;
-		passes.discarded = disc;
-		passes.lastDisc = discQueue;
+		});
 		let texture = this.ctx.textures.allocTarget("dirShadowMap",this.size,this.size,false,this.format);
 		if(this.customDepth && (this.depth == null || this.depth.width != this.size || this.depth.height != this.size || this.depth.isDisposed())) {
 			if(this.depth != null) {
@@ -11864,39 +10363,15 @@ class h3d_pass_DirShadowMap extends h3d_pass_Shadows {
 			let slight = this.light == null ? this.ctx.lightSystem.shadowLight : this.light;
 			let ldir = slight == null ? null : slight.getShadowDirection();
 			if(ldir == null) {
-				let _this = this.lightCamera.target;
-				_this.x = 0;
-				_this.y = 0;
-				_this.z = -1;
-				_this.w = 1.;
+				this.lightCamera.target.set(0,0,-1);
 			} else {
-				let _this = this.lightCamera.target;
-				let x = ldir.x;
-				let y = ldir.y;
-				let z = ldir.z;
-				if(z == null) {
-					z = 0.;
-				}
-				if(y == null) {
-					y = 0.;
-				}
-				if(x == null) {
-					x = 0.;
-				}
-				_this.x = x;
-				_this.y = y;
-				_this.z = z;
-				_this.w = 1.;
+				this.lightCamera.target.set(ldir.x,ldir.y,ldir.z);
 				this.lightCamera.target.normalize();
 			}
 			this.lightCamera.target.x += ct.x;
 			this.lightCamera.target.y += ct.y;
 			this.lightCamera.target.z += ct.z;
-			let _this = this.lightCamera.pos;
-			_this.x = ct.x;
-			_this.y = ct.y;
-			_this.z = ct.z;
-			_this.w = ct.w;
+			this.lightCamera.pos.load(ct);
 			this.lightCamera.update();
 		}
 		this.ctx.engine.pushTarget(texture);
@@ -11908,8 +10383,8 @@ class h3d_pass_DirShadowMap extends h3d_pass_Shadows {
 		this.ctx.engine.popTarget();
 		if(this.mode == h3d_pass_RenderMode.Mixed && !this.ctx.computingStatic) {
 			let merge = this.ctx.textures.allocTarget("mergedDirShadowMap",this.size,this.size,false,this.format);
-			this.mergePass.shader.texA__ = texture;
-			this.mergePass.shader.texB__ = this.staticTexture;
+			this.mergePass.shader.set_texA(texture);
+			this.mergePass.shader.set_texB(this.staticTexture);
 			this.ctx.engine.pushTarget(merge);
 			this.mergePass.render();
 			this.ctx.engine.popTarget();
@@ -11952,7 +10427,7 @@ class h3d_pass_DefaultShadowMap extends h3d_pass_DirShadowMap {
 	}
 	draw(passes,sort) {
 		super.draw(passes,sort);
-		this.ctx.setGlobalID(this.shadowMapId,{ texture : this.dshader.shadowMap__, channel : this.format == h3d_mat_Texture.nativeFormat ? hxsl_Channel.PackedFloat : hxsl_Channel.R});
+		this.ctx.setGlobalID(this.shadowMapId,{ texture : this.dshader.get_shadowMap(), channel : this.format == h3d_mat_Texture.nativeFormat ? hxsl_Channel.PackedFloat : hxsl_Channel.R});
 		this.ctx.setGlobalID(this.shadowProjId,this.getShadowProj());
 		this.ctx.setGlobalID(this.shadowColorId,this.color);
 		this.ctx.setGlobalID(this.shadowPowerId,this.power);
@@ -11999,10 +10474,33 @@ h3d_pass__$HardwarePick_FixedColor.__super__ = hxsl_Shader;
 Object.assign(h3d_pass__$HardwarePick_FixedColor.prototype, {
 	__class__: h3d_pass__$HardwarePick_FixedColor
 });
+class h3d_pass_PassListIterator {
+	constructor(o) {
+		this.o = o;
+	}
+	hasNext() {
+		return this.o != null;
+	}
+	next() {
+		let tmp = this.o;
+		this.o = this.o.next;
+		return tmp;
+	}
+}
+h3d_pass_PassListIterator.__name__ = "h3d.pass.PassListIterator";
+Object.assign(h3d_pass_PassListIterator.prototype, {
+	__class__: h3d_pass_PassListIterator
+});
 class h3d_pass_PassList {
 	constructor(current) {
-		this.current = current;
+		this.init(current);
+	}
+	init(pass) {
+		this.current = pass;
 		this.discarded = this.lastDisc = null;
+	}
+	isEmpty() {
+		return this.current == null;
 	}
 	clear() {
 		if(this.current == null) {
@@ -12017,6 +10515,46 @@ class h3d_pass_PassList {
 		while(p.next != null) p = p.next;
 		this.lastDisc = p;
 		this.current = null;
+	}
+	sort(f) {
+		this.current = haxe_ds_ListSort.sortSingleLinked(this.current,f);
+	}
+	filter(f) {
+		let head = null;
+		let prev = null;
+		let disc = this.discarded;
+		let discQueue = this.lastDisc;
+		let cur = this.current;
+		while(cur != null) {
+			if(f(cur)) {
+				if(head == null) {
+					prev = cur;
+					head = prev;
+				} else {
+					prev.next = cur;
+					prev = cur;
+				}
+			} else if(disc == null) {
+				discQueue = cur;
+				disc = discQueue;
+			} else {
+				discQueue.next = cur;
+				discQueue = cur;
+			}
+			cur = cur.next;
+		}
+		if(prev != null) {
+			prev.next = null;
+		}
+		if(discQueue != null) {
+			discQueue.next = null;
+		}
+		this.current = head;
+		this.discarded = disc;
+		this.lastDisc = discQueue;
+	}
+	iterator() {
+		return new h3d_pass_PassListIterator(this.current);
 	}
 }
 h3d_pass_PassList.__name__ = "h3d.pass.PassList";
@@ -12277,12 +10815,38 @@ class h3d_pass_ShaderManager {
 		}
 		return "(not found)";
 	}
+	getPtr(data) {
+		return data;
+	}
+	getParamValue(p,shaders,opt) {
+		if(opt == null) {
+			opt = false;
+		}
+		if(p.perObjectGlobal != null) {
+			let v = this.globals.fastGet(p.perObjectGlobal.gid);
+			if(v == null) {
+				throw haxe_Exception.thrown("Missing global value " + p.perObjectGlobal.path + " for shader " + this.shaderInfo(shaders,p.perObjectGlobal.path));
+			}
+			if(p.type._hx_index == 17) {
+				return v.texture;
+			}
+			return v;
+		}
+		let si = shaders;
+		let n = p.instance;
+		while(--n > 0) si = si.next;
+		let v = si.s.getParamValue(p.index);
+		if(v == null && !opt) {
+			throw haxe_Exception.thrown("Missing param value " + Std.string(si.s) + "." + p.name);
+		}
+		return v;
+	}
 	fillGlobals(buf,s) {
 		let s1 = s.vertex;
 		let g = s1.globals;
-		let ptr = buf.vertex.globals;
+		let ptr = this.getPtr(buf.vertex.globals);
 		while(g != null) {
-			let v = this.globals.map.h[g.gid];
+			let v = this.globals.fastGet(g.gid);
 			if(v == null) {
 				if(g.path == "__consts__") {
 					this.fillRec(s1.consts,g.type,ptr,g.pos);
@@ -12296,9 +10860,9 @@ class h3d_pass_ShaderManager {
 		}
 		let s2 = s.fragment;
 		let g1 = s2.globals;
-		let ptr1 = buf.fragment.globals;
+		let ptr1 = this.getPtr(buf.fragment.globals);
 		while(g1 != null) {
-			let v = this.globals.map.h[g1.gid];
+			let v = this.globals.fastGet(g1.gid);
 			if(v == null) {
 				if(g1.path == "__consts__") {
 					this.fillRec(s2.consts,g1.type,ptr1,g1.pos);
@@ -12317,7 +10881,7 @@ class h3d_pass_ShaderManager {
 		let buf1 = buf.vertex;
 		let s1 = s.vertex;
 		let p = s1.params;
-		let ptr = buf1.params;
+		let ptr = this.getPtr(buf1.params);
 		while(p != null) {
 			let v;
 			if(p.perObjectGlobal == null) {
@@ -12352,21 +10916,8 @@ class h3d_pass_ShaderManager {
 				if(v == null) {
 					throw haxe_Exception.thrown("Missing param value " + Std.string(curInstanceValue) + "." + p.name);
 				}
-			} else if(p.perObjectGlobal != null) {
-				let v1 = this.globals.map.h[p.perObjectGlobal.gid];
-				if(v1 == null) {
-					throw haxe_Exception.thrown("Missing global value " + p.perObjectGlobal.path + " for shader " + this.shaderInfo(shaders,p.perObjectGlobal.path));
-				}
-				v = p.type._hx_index == 17 ? v1.texture : v1;
 			} else {
-				let si = shaders;
-				let n = p.instance;
-				while(--n > 0) si = si.next;
-				let v1 = si.s.getParamValue(p.index);
-				if(v1 == null) {
-					throw haxe_Exception.thrown("Missing param value " + Std.string(si.s) + "." + p.name);
-				}
-				v = v1;
+				v = this.getParamValue(p,shaders);
 			}
 			this.fillRec(v,p.type,ptr,p.pos);
 			p = p.next;
@@ -12374,63 +10925,20 @@ class h3d_pass_ShaderManager {
 		let tid = 0;
 		let p1 = s1.textures;
 		while(p1 != null) {
-			let this1 = buf1.tex;
-			let index = tid++;
-			let opt = !h3d_pass_ShaderManager.STRICT;
-			if(opt == null) {
-				opt = false;
-			}
-			let val;
-			if(p1.perObjectGlobal != null) {
-				let v = this.globals.map.h[p1.perObjectGlobal.gid];
-				if(v == null) {
-					throw haxe_Exception.thrown("Missing global value " + p1.perObjectGlobal.path + " for shader " + this.shaderInfo(shaders,p1.perObjectGlobal.path));
-				}
-				val = p1.type._hx_index == 17 ? v.texture : v;
-			} else {
-				let si = shaders;
-				let n = p1.instance;
-				while(--n > 0) si = si.next;
-				let v = si.s.getParamValue(p1.index);
-				if(v == null && !opt) {
-					throw haxe_Exception.thrown("Missing param value " + Std.string(si.s) + "." + p1.name);
-				}
-				val = v;
-			}
-			this1[index] = val;
+			buf1.tex[tid++] = this.getParamValue(p1,shaders,!h3d_pass_ShaderManager.STRICT);
 			p1 = p1.next;
 		}
 		let p2 = s1.buffers;
 		let bid = 0;
 		while(p2 != null) {
-			let opt = !h3d_pass_ShaderManager.STRICT;
-			if(opt == null) {
-				opt = false;
-			}
-			let b;
-			if(p2.perObjectGlobal != null) {
-				let v = this.globals.map.h[p2.perObjectGlobal.gid];
-				if(v == null) {
-					throw haxe_Exception.thrown("Missing global value " + p2.perObjectGlobal.path + " for shader " + this.shaderInfo(shaders,p2.perObjectGlobal.path));
-				}
-				b = p2.type._hx_index == 17 ? v.texture : v;
-			} else {
-				let si = shaders;
-				let n = p2.instance;
-				while(--n > 0) si = si.next;
-				let v = si.s.getParamValue(p2.index);
-				if(v == null && !opt) {
-					throw haxe_Exception.thrown("Missing param value " + Std.string(si.s) + "." + p2.name);
-				}
-				b = v;
-			}
+			let b = this.getParamValue(p2,shaders,!h3d_pass_ShaderManager.STRICT);
 			buf1.buffers[bid++] = b;
 			p2 = p2.next;
 		}
 		let buf2 = buf.fragment;
 		let s2 = s.fragment;
 		let p3 = s2.params;
-		let ptr1 = buf2.params;
+		let ptr1 = this.getPtr(buf2.params);
 		while(p3 != null) {
 			let v;
 			if(p3.perObjectGlobal == null) {
@@ -12465,21 +10973,8 @@ class h3d_pass_ShaderManager {
 				if(v == null) {
 					throw haxe_Exception.thrown("Missing param value " + Std.string(curInstanceValue) + "." + p3.name);
 				}
-			} else if(p3.perObjectGlobal != null) {
-				let v1 = this.globals.map.h[p3.perObjectGlobal.gid];
-				if(v1 == null) {
-					throw haxe_Exception.thrown("Missing global value " + p3.perObjectGlobal.path + " for shader " + this.shaderInfo(shaders,p3.perObjectGlobal.path));
-				}
-				v = p3.type._hx_index == 17 ? v1.texture : v1;
 			} else {
-				let si = shaders;
-				let n = p3.instance;
-				while(--n > 0) si = si.next;
-				let v1 = si.s.getParamValue(p3.index);
-				if(v1 == null) {
-					throw haxe_Exception.thrown("Missing param value " + Std.string(si.s) + "." + p3.name);
-				}
-				v = v1;
+				v = this.getParamValue(p3,shaders);
 			}
 			this.fillRec(v,p3.type,ptr1,p3.pos);
 			p3 = p3.next;
@@ -12487,56 +10982,13 @@ class h3d_pass_ShaderManager {
 		let tid1 = 0;
 		let p4 = s2.textures;
 		while(p4 != null) {
-			let this1 = buf2.tex;
-			let index = tid1++;
-			let opt = !h3d_pass_ShaderManager.STRICT;
-			if(opt == null) {
-				opt = false;
-			}
-			let val;
-			if(p4.perObjectGlobal != null) {
-				let v = this.globals.map.h[p4.perObjectGlobal.gid];
-				if(v == null) {
-					throw haxe_Exception.thrown("Missing global value " + p4.perObjectGlobal.path + " for shader " + this.shaderInfo(shaders,p4.perObjectGlobal.path));
-				}
-				val = p4.type._hx_index == 17 ? v.texture : v;
-			} else {
-				let si = shaders;
-				let n = p4.instance;
-				while(--n > 0) si = si.next;
-				let v = si.s.getParamValue(p4.index);
-				if(v == null && !opt) {
-					throw haxe_Exception.thrown("Missing param value " + Std.string(si.s) + "." + p4.name);
-				}
-				val = v;
-			}
-			this1[index] = val;
+			buf2.tex[tid1++] = this.getParamValue(p4,shaders,!h3d_pass_ShaderManager.STRICT);
 			p4 = p4.next;
 		}
 		let p5 = s2.buffers;
 		let bid1 = 0;
 		while(p5 != null) {
-			let opt = !h3d_pass_ShaderManager.STRICT;
-			if(opt == null) {
-				opt = false;
-			}
-			let b;
-			if(p5.perObjectGlobal != null) {
-				let v = this.globals.map.h[p5.perObjectGlobal.gid];
-				if(v == null) {
-					throw haxe_Exception.thrown("Missing global value " + p5.perObjectGlobal.path + " for shader " + this.shaderInfo(shaders,p5.perObjectGlobal.path));
-				}
-				b = p5.type._hx_index == 17 ? v.texture : v;
-			} else {
-				let si = shaders;
-				let n = p5.instance;
-				while(--n > 0) si = si.next;
-				let v = si.s.getParamValue(p5.index);
-				if(v == null && !opt) {
-					throw haxe_Exception.thrown("Missing param value " + Std.string(si.s) + "." + p5.name);
-				}
-				b = v;
-			}
+			let b = this.getParamValue(p5,shaders,!h3d_pass_ShaderManager.STRICT);
 			buf2.buffers[bid1++] = b;
 			p5 = p5.next;
 		}
@@ -12545,18 +10997,16 @@ class h3d_pass_ShaderManager {
 		if(batchMode == null) {
 			batchMode = false;
 		}
-		this.globals.maxChannels = 0;
-		let last = null;
-		let _g_l = shaders;
-		while(_g_l != last) {
-			let s = _g_l.s;
-			_g_l = _g_l.next;
-			s.updateConstants(this.globals);
+		this.globals.resetChannels();
+		let s = shaders.iterator();
+		while(s.hasNext()) {
+			let s1 = s.next();
+			s1.updateConstants(this.globals);
 		}
 		this.currentOutput.next = shaders;
-		let s = this.shaderCache.link(this.currentOutput,batchMode);
+		let s1 = this.shaderCache.link(this.currentOutput,batchMode);
 		this.currentOutput.next = null;
-		return s;
+		return s1;
 	}
 }
 h3d_pass_ShaderManager.__name__ = "h3d.pass.ShaderManager";
@@ -12586,91 +11036,24 @@ class h3d_pass_SortByMaterial {
 	sort(passes) {
 		let shaderStart = this.shaderCount;
 		let textureStart = this.textureCount;
-		let _g_o = passes.current;
-		while(_g_o != null) {
-			let tmp = _g_o;
-			_g_o = _g_o.next;
-			if(this.shaderIdMap[tmp.shader.id] < shaderStart || this.shaderIdMap[tmp.shader.id] == null) {
-				this.shaderIdMap[tmp.shader.id] = this.shaderCount++;
+		let _gthis = this;
+		let p = passes.iterator();
+		while(p.hasNext()) {
+			let p1 = p.next();
+			if(this.shaderIdMap[p1.shader.id] < shaderStart || this.shaderIdMap[p1.shader.id] == null) {
+				this.shaderIdMap[p1.shader.id] = this.shaderCount++;
 			}
-			if(this.textureIdMap[tmp.texture] < textureStart || this.textureIdMap[tmp.shader.id] == null) {
-				this.textureIdMap[tmp.texture] = this.textureCount++;
+			if(this.textureIdMap[p1.texture] < textureStart || this.textureIdMap[p1.shader.id] == null) {
+				this.textureIdMap[p1.texture] = this.textureCount++;
 			}
 		}
-		let list = passes.current;
-		let tmp;
-		if(list == null) {
-			tmp = null;
-		} else {
-			let insize = 1;
-			let nmerges;
-			let psize = 0;
-			let qsize = 0;
-			let p;
-			let q;
-			let e;
-			let tail;
-			while(true) {
-				p = list;
-				list = null;
-				tail = null;
-				nmerges = 0;
-				while(p != null) {
-					++nmerges;
-					q = p;
-					psize = 0;
-					let _g = 0;
-					let _g1 = insize;
-					while(_g < _g1) {
-						++_g;
-						++psize;
-						q = q.next;
-						if(q == null) {
-							break;
-						}
-					}
-					qsize = insize;
-					while(psize > 0 || qsize > 0 && q != null) {
-						if(psize == 0) {
-							e = q;
-							q = q.next;
-							--qsize;
-						} else {
-							let tmp;
-							if(!(qsize == 0 || q == null)) {
-								let d = this.shaderIdMap[p.shader.id] - this.shaderIdMap[q.shader.id];
-								tmp = (d != 0 ? d : this.textureIdMap[p.texture] - this.textureIdMap[q.texture]) <= 0;
-							} else {
-								tmp = true;
-							}
-							if(tmp) {
-								e = p;
-								p = p.next;
-								--psize;
-							} else {
-								e = q;
-								q = q.next;
-								--qsize;
-							}
-						}
-						if(tail != null) {
-							tail.next = e;
-						} else {
-							list = e;
-						}
-						tail = e;
-					}
-					p = q;
-				}
-				tail.next = null;
-				if(nmerges <= 1) {
-					break;
-				}
-				insize *= 2;
+		passes.sort(function(o1,o2) {
+			let d = _gthis.shaderIdMap[o1.shader.id] - _gthis.shaderIdMap[o2.shader.id];
+			if(d != 0) {
+				return d;
 			}
-			tmp = list;
-		}
-		passes.current = tmp;
+			return _gthis.textureIdMap[o1.texture] - _gthis.textureIdMap[o2.texture];
+		});
 	}
 }
 h3d_pass_SortByMaterial.__name__ = "h3d.pass.SortByMaterial";
@@ -12850,11 +11233,11 @@ class h3d_prim_Plane2D extends h3d_prim_Primitive {
 		if(this.buffer == null || this.buffer.isDisposed()) {
 			this.alloc(engine);
 		}
-		engine.renderBuffer(this.buffer,engine.mem.quadIndexes,2,0,-1);
+		engine.renderQuadBuffer(this.buffer);
 	}
 	static get() {
-		let engine = h3d_Engine.CURRENT;
-		let inst = engine.resCache.h[h3d_prim_Plane2D.__id__];
+		let engine = h3d_Engine.getCurrent();
+		let inst = engine.resCache.get(h3d_prim_Plane2D);
 		if(inst == null) {
 			inst = new h3d_prim_Plane2D();
 			engine.resCache.set(h3d_prim_Plane2D,inst);
@@ -12896,7 +11279,7 @@ class h3d_prim_RawPrimitive extends h3d_prim_Primitive {
 		}
 		this.buffer = h3d_Buffer.ofFloats(inf.vbuf,inf.stride,flags);
 		this.vcount = this.buffer.vertices;
-		this.tcount = inf.ibuf != null ? inf.ibuf.length / 3 | 0 : inf.quads ? this.vcount >> 1 : this.vcount / 3 | 0;
+		this.tcount = inf.ibuf != null ? Std.int(inf.ibuf.length / 3) : inf.quads ? this.vcount >> 1 : Std.int(this.vcount / 3);
 		if(inf.ibuf != null) {
 			this.indexes = h3d_Indexes.alloc(inf.ibuf);
 		} else if(this.indexes != null) {
@@ -12927,43 +11310,78 @@ class h3d_scene_Object {
 		this.flags = 0;
 		this.absPos = new h3d_Matrix();
 		this.absPos.identity();
-		this.x = 0;
-		this.flags |= 1;
-		this.y = 0;
-		this.flags |= 1;
-		this.z = 0;
-		this.flags |= 1;
-		this.scaleX = 1;
-		this.flags |= 1;
-		this.scaleY = 1;
-		this.flags |= 1;
-		this.scaleZ = 1;
-		this.flags |= 1;
+		this.set_x(0);
+		this.set_y(0);
+		this.set_z(0);
+		this.set_scaleX(1);
+		this.set_scaleY(1);
+		this.set_scaleZ(1);
 		this.qRot = new h3d_Quat();
-		let b = this.follow != null;
-		if(b) {
-			this.flags |= 1;
-		} else {
-			this.flags &= -2;
-		}
-		this.flags |= 2;
+		this.set_posChanged(false);
+		this.set_visible(true);
 		this.children = [];
 		if(parent != null) {
 			parent.addChild(this);
 		}
+	}
+	get_visible() {
+		return (this.flags & 2) != 0;
+	}
+	get_allocated() {
+		return (this.flags & 32) != 0;
+	}
+	get_posChanged() {
+		return (this.flags & 1) != 0;
+	}
+	get_culled() {
+		return (this.flags & 4) != 0;
+	}
+	get_followPositionOnly() {
+		return (this.flags & 8) != 0;
+	}
+	get_lightCameraCenter() {
+		return (this.flags & 16) != 0;
+	}
+	get_alwaysSync() {
+		return (this.flags & 64) != 0;
+	}
+	get_inheritCulled() {
+		return (this.flags & 128) != 0;
+	}
+	get_ignoreParentTransform() {
+		return (this.flags & 2048) != 0;
+	}
+	set_posChanged(b) {
+		let b1 = b || this.follow != null;
+		if(b1) {
+			this.flags |= 1;
+		} else {
+			this.flags &= -2;
+		}
+		return b1;
+	}
+	set_visible(b) {
+		if(b) {
+			this.flags |= 2;
+		} else {
+			this.flags &= -3;
+		}
+		return b;
+	}
+	set_allocated(b) {
+		if(b) {
+			this.flags |= 32;
+		} else {
+			this.flags &= -33;
+		}
+		return b;
 	}
 	localToGlobal(pt) {
 		this.syncPos();
 		if(pt == null) {
 			pt = new h3d_Vector();
 		}
-		let m = this.absPos;
-		let px = pt.x * m._11 + pt.y * m._21 + pt.z * m._31 + pt.w * m._41;
-		let py = pt.x * m._12 + pt.y * m._22 + pt.z * m._32 + pt.w * m._42;
-		let pz = pt.x * m._13 + pt.y * m._23 + pt.z * m._33 + pt.w * m._43;
-		pt.x = px;
-		pt.y = py;
-		pt.z = pz;
+		pt.transform3x4(this.absPos);
 		return pt;
 	}
 	getInvPos() {
@@ -12995,23 +11413,19 @@ class h3d_scene_Object {
 			p = p.parent;
 		}
 		if(o.parent != null) {
-			let old = (o.flags & 32) != 0;
-			o.flags &= -33;
+			let old = o.get_allocated();
+			o.set_allocated(false);
 			o.parent.removeChild(o);
-			if(old) {
-				o.flags |= 32;
-			} else {
-				o.flags &= -33;
-			}
+			o.set_allocated(old);
 		}
 		this.children.splice(pos,0,o);
-		if((this.flags & 32) == 0 && (o.flags & 32) != 0) {
+		if(!this.get_allocated() && o.get_allocated()) {
 			o.onRemove();
 		}
 		o.parent = this;
-		o.flags |= 1;
-		if((this.flags & 32) != 0) {
-			if((o.flags & 32) == 0) {
+		o.set_posChanged(true);
+		if(this.get_allocated()) {
+			if(!o.get_allocated()) {
 				o.onAdd();
 			} else {
 				o.onParentChanged();
@@ -13019,11 +11433,11 @@ class h3d_scene_Object {
 		}
 	}
 	iterVisibleMeshes(callb) {
-		if((this.flags & 2) == 0 || (this.flags & 4) != 0 && (this.flags & 128) != 0) {
+		if(!this.get_visible() || this.get_culled() && this.get_inheritCulled()) {
 			return;
 		}
-		if((this.flags & 4) == 0) {
-			let m = ((this) instanceof h3d_scene_Mesh) ? this : null;
+		if(!this.get_culled()) {
+			let m = hxd_impl_Api.downcast(this,h3d_scene_Mesh);
 			if(m != null) {
 				callb(m);
 			}
@@ -13046,7 +11460,7 @@ class h3d_scene_Object {
 		}
 	}
 	onAdd() {
-		this.flags |= 32;
+		this.set_allocated(true);
 		let _g = 0;
 		let _g1 = this.children;
 		while(_g < _g1.length) {
@@ -13056,7 +11470,7 @@ class h3d_scene_Object {
 		}
 	}
 	onRemove() {
-		this.flags &= -33;
+		this.set_allocated(false);
 		let _g = 0;
 		let _g1 = this.children;
 		while(_g < _g1.length) {
@@ -13067,21 +11481,17 @@ class h3d_scene_Object {
 	}
 	removeChild(o) {
 		if(HxOverrides.remove(this.children,o)) {
-			if((o.flags & 32) != 0) {
+			if(o.get_allocated()) {
 				o.onRemove();
 			}
 			o.parent = null;
-			o.flags |= 1;
+			o.set_posChanged(true);
 		}
 	}
 	getScene() {
 		let p = this;
 		while(p.parent != null) p = p.parent;
-		if(((p) instanceof h3d_scene_Scene)) {
-			return p;
-		} else {
-			return null;
-		}
+		return hxd_impl_Api.downcast(p,h3d_scene_Scene);
 	}
 	getAbsPos() {
 		this.syncPos();
@@ -13105,145 +11515,19 @@ class h3d_scene_Object {
 		this.absPos._43 = this.z;
 		if(this.follow != null) {
 			this.follow.syncPos();
-			if((this.flags & 8) != 0) {
-				let _this = this.absPos;
-				let a = this.absPos;
-				let b = this.parent.absPos;
-				let m11 = a._11;
-				let m12 = a._12;
-				let m13 = a._13;
-				let m21 = a._21;
-				let m22 = a._22;
-				let m23 = a._23;
-				let a31 = a._31;
-				let a32 = a._32;
-				let a33 = a._33;
-				let a41 = a._41;
-				let a42 = a._42;
-				let a43 = a._43;
-				let b11 = b._11;
-				let b12 = b._12;
-				let b13 = b._13;
-				let b21 = b._21;
-				let b22 = b._22;
-				let b23 = b._23;
-				let b31 = b._31;
-				let b32 = b._32;
-				let b33 = b._33;
-				let b41 = b._41;
-				let b42 = b._42;
-				let b43 = b._43;
-				_this._11 = m11 * b11 + m12 * b21 + m13 * b31;
-				_this._12 = m11 * b12 + m12 * b22 + m13 * b32;
-				_this._13 = m11 * b13 + m12 * b23 + m13 * b33;
-				_this._14 = 0;
-				_this._21 = m21 * b11 + m22 * b21 + m23 * b31;
-				_this._22 = m21 * b12 + m22 * b22 + m23 * b32;
-				_this._23 = m21 * b13 + m22 * b23 + m23 * b33;
-				_this._24 = 0;
-				_this._31 = a31 * b11 + a32 * b21 + a33 * b31;
-				_this._32 = a31 * b12 + a32 * b22 + a33 * b32;
-				_this._33 = a31 * b13 + a32 * b23 + a33 * b33;
-				_this._34 = 0;
-				_this._41 = a41 * b11 + a42 * b21 + a43 * b31 + b41;
-				_this._42 = a41 * b12 + a42 * b22 + a43 * b32 + b42;
-				_this._43 = a41 * b13 + a42 * b23 + a43 * b33 + b43;
-				_this._44 = 1;
-				this.absPos._41 = this.x + this.follow.absPos._41;
-				this.absPos._42 = this.y + this.follow.absPos._42;
-				this.absPos._43 = this.z + this.follow.absPos._43;
+			if(this.get_followPositionOnly()) {
+				this.absPos.multiply3x4inline(this.absPos,this.parent.absPos);
+				this.absPos.set_tx(this.x + this.follow.absPos.get_tx());
+				this.absPos.set_ty(this.y + this.follow.absPos.get_ty());
+				this.absPos.set_tz(this.z + this.follow.absPos.get_tz());
 			} else {
 				this.absPos.multiply3x4(this.absPos,this.follow.absPos);
 			}
-		} else if(this.parent != null && (this.flags & 2048) == 0) {
-			let _this = this.absPos;
-			let a = this.absPos;
-			let b = this.parent.absPos;
-			let m11 = a._11;
-			let m12 = a._12;
-			let m13 = a._13;
-			let m21 = a._21;
-			let m22 = a._22;
-			let m23 = a._23;
-			let a31 = a._31;
-			let a32 = a._32;
-			let a33 = a._33;
-			let a41 = a._41;
-			let a42 = a._42;
-			let a43 = a._43;
-			let b11 = b._11;
-			let b12 = b._12;
-			let b13 = b._13;
-			let b21 = b._21;
-			let b22 = b._22;
-			let b23 = b._23;
-			let b31 = b._31;
-			let b32 = b._32;
-			let b33 = b._33;
-			let b41 = b._41;
-			let b42 = b._42;
-			let b43 = b._43;
-			_this._11 = m11 * b11 + m12 * b21 + m13 * b31;
-			_this._12 = m11 * b12 + m12 * b22 + m13 * b32;
-			_this._13 = m11 * b13 + m12 * b23 + m13 * b33;
-			_this._14 = 0;
-			_this._21 = m21 * b11 + m22 * b21 + m23 * b31;
-			_this._22 = m21 * b12 + m22 * b22 + m23 * b32;
-			_this._23 = m21 * b13 + m22 * b23 + m23 * b33;
-			_this._24 = 0;
-			_this._31 = a31 * b11 + a32 * b21 + a33 * b31;
-			_this._32 = a31 * b12 + a32 * b22 + a33 * b32;
-			_this._33 = a31 * b13 + a32 * b23 + a33 * b33;
-			_this._34 = 0;
-			_this._41 = a41 * b11 + a42 * b21 + a43 * b31 + b41;
-			_this._42 = a41 * b12 + a42 * b22 + a43 * b32 + b42;
-			_this._43 = a41 * b13 + a42 * b23 + a43 * b33 + b43;
-			_this._44 = 1;
+		} else if(this.parent != null && !this.get_ignoreParentTransform()) {
+			this.absPos.multiply3x4inline(this.absPos,this.parent.absPos);
 		}
 		if(this.defaultTransform != null) {
-			let _this = this.absPos;
-			let a = this.defaultTransform;
-			let b = this.absPos;
-			let m11 = a._11;
-			let m12 = a._12;
-			let m13 = a._13;
-			let m21 = a._21;
-			let m22 = a._22;
-			let m23 = a._23;
-			let a31 = a._31;
-			let a32 = a._32;
-			let a33 = a._33;
-			let a41 = a._41;
-			let a42 = a._42;
-			let a43 = a._43;
-			let b11 = b._11;
-			let b12 = b._12;
-			let b13 = b._13;
-			let b21 = b._21;
-			let b22 = b._22;
-			let b23 = b._23;
-			let b31 = b._31;
-			let b32 = b._32;
-			let b33 = b._33;
-			let b41 = b._41;
-			let b42 = b._42;
-			let b43 = b._43;
-			_this._11 = m11 * b11 + m12 * b21 + m13 * b31;
-			_this._12 = m11 * b12 + m12 * b22 + m13 * b32;
-			_this._13 = m11 * b13 + m12 * b23 + m13 * b33;
-			_this._14 = 0;
-			_this._21 = m21 * b11 + m22 * b21 + m23 * b31;
-			_this._22 = m21 * b12 + m22 * b22 + m23 * b32;
-			_this._23 = m21 * b13 + m22 * b23 + m23 * b33;
-			_this._24 = 0;
-			_this._31 = a31 * b11 + a32 * b21 + a33 * b31;
-			_this._32 = a31 * b12 + a32 * b22 + a33 * b32;
-			_this._33 = a31 * b13 + a32 * b23 + a33 * b33;
-			_this._34 = 0;
-			_this._41 = a41 * b11 + a42 * b21 + a43 * b31 + b41;
-			_this._42 = a41 * b12 + a42 * b22 + a43 * b32 + b42;
-			_this._43 = a41 * b13 + a42 * b23 + a43 * b33 + b43;
-			_this._44 = 1;
+			this.absPos.multiply3x4inline(this.defaultTransform,this.absPos);
 		}
 		if(this.invPos != null) {
 			this.invPos._44 = 0;
@@ -13256,7 +11540,7 @@ class h3d_scene_Object {
 			let old = this.parent;
 			let dt = ctx.elapsedTime;
 			while(dt > 0 && this.currentAnimation != null) dt = this.currentAnimation.update(dt);
-			if(this.currentAnimation != null && (ctx.visibleFlag && (this.flags & 2) != 0 && (this.flags & 4) == 0 || (this.flags & 64) != 0)) {
+			if(this.currentAnimation != null && (ctx.visibleFlag && this.get_visible() && !this.get_culled() || this.get_alwaysSync())) {
 				this.currentAnimation.sync();
 			}
 			if(this.parent == null && old != null) {
@@ -13264,20 +11548,15 @@ class h3d_scene_Object {
 			}
 		}
 		let old = ctx.visibleFlag;
-		if((this.flags & 2) == 0 || (this.flags & 4) != 0 && (this.flags & 128) != 0) {
+		if(!this.get_visible() || this.get_culled() && this.get_inheritCulled()) {
 			ctx.visibleFlag = false;
 		}
-		let changed = (this.flags & 1) != 0;
+		let changed = this.get_posChanged();
 		if(changed) {
 			this.calcAbsPos();
 		}
 		this.sync(ctx);
-		let b = this.follow != null;
-		if(b) {
-			this.flags |= 1;
-		} else {
-			this.flags &= -2;
-		}
+		this.set_posChanged(false);
 		this.lastFrame = ctx.frame;
 		let p = 0;
 		let len = this.children.length;
@@ -13288,7 +11567,7 @@ class h3d_scene_Object {
 			}
 			if(c.lastFrame != ctx.frame) {
 				if(changed) {
-					c.flags |= 1;
+					c.set_posChanged(true);
 				}
 				c.syncRec(ctx);
 			}
@@ -13305,49 +11584,39 @@ class h3d_scene_Object {
 		if(this.parent != null) {
 			this.parent.syncPos();
 		}
-		if((this.flags & 1) != 0) {
-			let b = this.follow != null;
-			if(b) {
-				this.flags |= 1;
-			} else {
-				this.flags &= -2;
-			}
+		if(this.get_posChanged()) {
+			this.set_posChanged(false);
 			this.calcAbsPos();
 			let _g = 0;
 			let _g1 = this.children;
 			while(_g < _g1.length) {
 				let c = _g1[_g];
 				++_g;
-				c.flags |= 1;
+				c.set_posChanged(true);
 			}
 		}
 	}
 	emit(ctx) {
 	}
 	emitRec(ctx) {
-		if((this.flags & 2) == 0 || (this.flags & 4) != 0 && (this.flags & 128) != 0 && !ctx.computingStatic) {
+		if(!this.get_visible() || this.get_culled() && this.get_inheritCulled() && !ctx.computingStatic) {
 			return;
 		}
-		if((this.flags & 1) != 0) {
+		if(this.get_posChanged()) {
 			if(this.currentAnimation != null) {
 				this.currentAnimation.sync();
 			}
-			let b = this.follow != null;
-			if(b) {
-				this.flags |= 1;
-			} else {
-				this.flags &= -2;
-			}
+			this.set_posChanged(false);
 			this.calcAbsPos();
 			let _g = 0;
 			let _g1 = this.children;
 			while(_g < _g1.length) {
 				let c = _g1[_g];
 				++_g;
-				c.flags |= 1;
+				c.set_posChanged(true);
 			}
 		}
-		if((this.flags & 4) == 0 || ctx.computingStatic) {
+		if(!this.get_culled() || ctx.computingStatic) {
 			this.emit(ctx);
 		}
 		let _g = 0;
@@ -13358,8 +11627,39 @@ class h3d_scene_Object {
 			c.emitRec(ctx);
 		}
 	}
+	set_x(v) {
+		this.x = v;
+		this.set_posChanged(true);
+		return v;
+	}
+	set_y(v) {
+		this.y = v;
+		this.set_posChanged(true);
+		return v;
+	}
+	set_z(v) {
+		this.z = v;
+		this.set_posChanged(true);
+		return v;
+	}
+	set_scaleX(v) {
+		this.scaleX = v;
+		this.set_posChanged(true);
+		return v;
+	}
+	set_scaleY(v) {
+		this.scaleY = v;
+		this.set_posChanged(true);
+		return v;
+	}
+	set_scaleZ(v) {
+		this.scaleZ = v;
+		this.set_posChanged(true);
+		return v;
+	}
 }
 h3d_scene_Object.__name__ = "h3d.scene.Object";
+h3d_scene_Object.__interfaces__ = [hxd_impl__$Serializable_NoSerializeSupport];
 Object.assign(h3d_scene_Object.prototype, {
 	__class__: h3d_scene_Object
 });
@@ -13377,11 +11677,7 @@ class h3d_scene_Mesh extends h3d_scene_Object {
 		this.primitive.render(ctx.engine);
 	}
 	emit(ctx) {
-		let p = this.material.passes;
-		while(p != null) {
-			ctx.emitPass(p,this).index = 0;
-			p = p.nextPass;
-		}
+		ctx.emit(this.material,this);
 	}
 	onAdd() {
 		super.onAdd();
@@ -13396,7 +11692,7 @@ class h3d_scene_Mesh extends h3d_scene_Object {
 		super.onRemove();
 	}
 	set_primitive(prim) {
-		if(prim != this.primitive && (this.flags & 32) != 0) {
+		if(prim != this.primitive && this.get_allocated()) {
 			if(this.primitive != null) {
 				this.primitive.decref();
 			}
@@ -13546,6 +11842,7 @@ class h3d_scene_Interactive extends h3d_scene_Object {
 	}
 }
 h3d_scene_Interactive.__name__ = "h3d.scene.Interactive";
+h3d_scene_Interactive.__interfaces__ = [hxd_Interactive];
 h3d_scene_Interactive.__super__ = h3d_scene_Object;
 Object.assign(h3d_scene_Interactive.prototype, {
 	__class__: h3d_scene_Interactive
@@ -13615,7 +11912,7 @@ class h3d_scene_LightSystem {
 		this.lightCount = 0;
 		this.ctx = ctx;
 		this.cullLights();
-		if(this.shadowLight == null || (this.shadowLight.flags & 32) == 0) {
+		if(this.shadowLight == null || !this.shadowLight.get_allocated()) {
 			let l = ctx.lights;
 			while(l != null) {
 				let dir = l.getShadowDirection();
@@ -13651,6 +11948,16 @@ class h3d_scene_RenderContext extends h3d_impl_RenderContext {
 		this.cachedShaderList = [];
 		this.cachedPassObjects = [];
 	}
+	emit(mat,obj,index) {
+		if(index == null) {
+			index = 0;
+		}
+		let p = mat.get_mainPass();
+		while(p != null) {
+			this.emitPass(p,obj).index = index;
+			p = p.nextPass;
+		}
+	}
 	start() {
 		this.sharedGlobals = [];
 		this.lights = null;
@@ -13661,6 +11968,10 @@ class h3d_scene_RenderContext extends h3d_impl_RenderContext {
 		this.visibleFlag = true;
 		this.time += this.elapsedTime;
 		this.frame++;
+	}
+	nextPass() {
+		this.cachedPos = 0;
+		this.drawPass = null;
 	}
 	setGlobalID(gid,value) {
 		let _g = 0;
@@ -13774,146 +12085,37 @@ class h3d_scene_Renderer extends hxd_impl_AnyProps {
 	}
 	depthSort(frontToBack,passes) {
 		let cam = this.ctx.camera.m;
-		let _g_o = passes.current;
-		while(_g_o != null) {
-			let tmp = _g_o;
-			_g_o = _g_o.next;
-			let z = tmp.obj.absPos._41 * cam._13 + tmp.obj.absPos._42 * cam._23 + tmp.obj.absPos._43 * cam._33 + cam._43;
-			let w = tmp.obj.absPos._41 * cam._14 + tmp.obj.absPos._42 * cam._24 + tmp.obj.absPos._43 * cam._34 + cam._44;
-			tmp.depth = z / w;
+		let p = passes.iterator();
+		while(p.hasNext()) {
+			let p1 = p.next();
+			let z = p1.obj.absPos._41 * cam._13 + p1.obj.absPos._42 * cam._23 + p1.obj.absPos._43 * cam._33 + cam._43;
+			let w = p1.obj.absPos._41 * cam._14 + p1.obj.absPos._42 * cam._24 + p1.obj.absPos._43 * cam._34 + cam._44;
+			p1.depth = z / w;
 		}
 		if(frontToBack) {
-			let list = passes.current;
-			let tmp;
-			if(list == null) {
-				tmp = null;
-			} else {
-				let insize = 1;
-				let nmerges;
-				let psize = 0;
-				let qsize = 0;
-				let p;
-				let q;
-				let e;
-				let tail;
-				while(true) {
-					p = list;
-					list = null;
-					tail = null;
-					nmerges = 0;
-					while(p != null) {
-						++nmerges;
-						q = p;
-						psize = 0;
-						let _g = 0;
-						let _g1 = insize;
-						while(_g < _g1) {
-							++_g;
-							++psize;
-							q = q.next;
-							if(q == null) {
-								break;
-							}
-						}
-						qsize = insize;
-						while(psize > 0 || qsize > 0 && q != null) {
-							if(psize == 0) {
-								e = q;
-								q = q.next;
-								--qsize;
-							} else if(qsize == 0 || q == null || (p.pass.layer == q.pass.layer ? p.depth > q.depth ? 1 : -1 : p.pass.layer - q.pass.layer) <= 0) {
-								e = p;
-								p = p.next;
-								--psize;
-							} else {
-								e = q;
-								q = q.next;
-								--qsize;
-							}
-							if(tail != null) {
-								tail.next = e;
-							} else {
-								list = e;
-							}
-							tail = e;
-						}
-						p = q;
+			passes.sort(function(p1,p2) {
+				if(p1.pass.layer == p2.pass.layer) {
+					if(p1.depth > p2.depth) {
+						return 1;
+					} else {
+						return -1;
 					}
-					tail.next = null;
-					if(nmerges <= 1) {
-						break;
-					}
-					insize *= 2;
+				} else {
+					return p1.pass.layer - p2.pass.layer;
 				}
-				tmp = list;
-			}
-			passes.current = tmp;
+			});
 		} else {
-			let list = passes.current;
-			let tmp;
-			if(list == null) {
-				tmp = null;
-			} else {
-				let insize = 1;
-				let nmerges;
-				let psize = 0;
-				let qsize = 0;
-				let p;
-				let q;
-				let e;
-				let tail;
-				while(true) {
-					p = list;
-					list = null;
-					tail = null;
-					nmerges = 0;
-					while(p != null) {
-						++nmerges;
-						q = p;
-						psize = 0;
-						let _g = 0;
-						let _g1 = insize;
-						while(_g < _g1) {
-							++_g;
-							++psize;
-							q = q.next;
-							if(q == null) {
-								break;
-							}
-						}
-						qsize = insize;
-						while(psize > 0 || qsize > 0 && q != null) {
-							if(psize == 0) {
-								e = q;
-								q = q.next;
-								--qsize;
-							} else if(qsize == 0 || q == null || (p.pass.layer == q.pass.layer ? p.depth > q.depth ? -1 : 1 : p.pass.layer - q.pass.layer) <= 0) {
-								e = p;
-								p = p.next;
-								--psize;
-							} else {
-								e = q;
-								q = q.next;
-								--qsize;
-							}
-							if(tail != null) {
-								tail.next = e;
-							} else {
-								list = e;
-							}
-							tail = e;
-						}
-						p = q;
+			passes.sort(function(p1,p2) {
+				if(p1.pass.layer == p2.pass.layer) {
+					if(p1.depth > p2.depth) {
+						return -1;
+					} else {
+						return 1;
 					}
-					tail.next = null;
-					if(nmerges <= 1) {
-						break;
-					}
-					insize *= 2;
+				} else {
+					return p1.pass.layer - p2.pass.layer;
 				}
-				tmp = list;
-			}
-			passes.current = tmp;
+			});
 		}
 	}
 	resetTarget() {
@@ -13923,10 +12125,10 @@ class h3d_scene_Renderer extends hxd_impl_AnyProps {
 		}
 	}
 	has(name) {
-		return this.passObjects.h[name] != null;
+		return this.passObjects.get(name) != null;
 	}
 	get(name) {
-		let p = this.passObjects.h[name];
+		let p = this.passObjects.get(name);
 		if(p == null) {
 			return this.emptyPasses;
 		}
@@ -13954,7 +12156,7 @@ class h3d_scene_Renderer extends hxd_impl_AnyProps {
 		while(_g2 < passes.length) {
 			let p = passes[_g2];
 			++_g2;
-			this.passObjects.h[p.name] = p;
+			this.passObjects.set(p.name,p);
 		}
 		this.ctx.textures.begin();
 		if(this.ctx.computingStatic) {
@@ -13967,7 +12169,7 @@ class h3d_scene_Renderer extends hxd_impl_AnyProps {
 		while(_g3 < passes.length) {
 			let p = passes[_g3];
 			++_g3;
-			this.passObjects.h[p.name] = null;
+			this.passObjects.set(p.name,null);
 		}
 	}
 }
@@ -13997,7 +12199,7 @@ class h3d_scene_Scene extends h3d_scene_Object {
 		this.hitInteractives = [];
 		this.interactives = [];
 		this.camera = new h3d_Camera();
-		let engine = h3d_Engine.CURRENT;
+		let engine = h3d_Engine.getCurrent();
 		if(engine != null) {
 			this.camera.screenRatio = engine.width / engine.height;
 		}
@@ -14046,7 +12248,7 @@ class h3d_scene_Scene extends h3d_scene_Object {
 	isInteractiveVisible(i) {
 		let o = i;
 		while(o != this) {
-			if(o == null || (o.flags & 2) == 0) {
+			if(o == null || !o.get_visible()) {
 				return false;
 			}
 			o = o.parent;
@@ -14062,50 +12264,8 @@ class h3d_scene_Scene extends h3d_scene_Object {
 			let screenY = -(event.relY / this.window.get_height() - 0.5) * 2;
 			let p0 = this.camera.unproject(screenX,screenY,0);
 			let p1 = this.camera.unproject(screenX,screenY,1);
-			let x = p0.x;
-			let y = p0.y;
-			let z = p0.z;
-			if(z == null) {
-				z = 0.;
-			}
-			if(y == null) {
-				y = 0.;
-			}
-			if(x == null) {
-				x = 0.;
-			}
-			let p1_x = x;
-			let p1_y = y;
-			let p1_z = z;
-			let x1 = p1.x;
-			let y1 = p1.y;
-			let z1 = p1.z;
-			if(z1 == null) {
-				z1 = 0.;
-			}
-			if(y1 == null) {
-				y1 = 0.;
-			}
-			if(x1 == null) {
-				x1 = 0.;
-			}
-			let p2_x = x1;
-			let p2_y = y1;
-			let p2_z = z1;
-			let r = new h3d_col_Ray();
-			r.px = p1_x;
-			r.py = p1_y;
-			r.pz = p1_z;
-			r.lx = p2_x - p1_x;
-			r.ly = p2_y - p1_y;
-			r.lz = p2_z - p1_z;
-			r.normalize();
-			let saveR_px = r.px;
-			let saveR_py = r.py;
-			let saveR_pz = r.pz;
-			let saveR_lx = r.lx;
-			let saveR_ly = r.ly;
-			let saveR_lz = r.lz;
+			let r = h3d_col_Ray.fromPoints(p0.toPoint(),p1.toPoint());
+			let saveR = r.clone();
 			let priority = -2147483648;
 			let _g = 0;
 			let _g1 = this.interactives;
@@ -14116,103 +12276,26 @@ class h3d_scene_Scene extends h3d_scene_Object {
 					continue;
 				}
 				let p = i;
-				while(p != null && (p.flags & 2) != 0) p = p.parent;
+				while(p != null && p.get_visible()) p = p.parent;
 				if(p != null) {
 					continue;
 				}
 				let minv = i.getInvPos();
-				let x = r.px;
-				let y = r.py;
-				let z = r.pz;
-				if(z == null) {
-					z = 0.;
-				}
-				if(y == null) {
-					y = 0.;
-				}
-				if(x == null) {
-					x = 0.;
-				}
-				let p_x = x;
-				let p_y = y;
-				let p_z = z;
-				let px = p_x * minv._11 + p_y * minv._21 + p_z * minv._31 + minv._41;
-				let py = p_x * minv._12 + p_y * minv._22 + p_z * minv._32 + minv._42;
-				let pz = p_x * minv._13 + p_y * minv._23 + p_z * minv._33 + minv._43;
-				p_x = px;
-				p_y = py;
-				p_z = pz;
-				r.px = p_x;
-				r.py = p_y;
-				r.pz = p_z;
-				let x1 = r.lx;
-				let y1 = r.ly;
-				let z1 = r.lz;
-				if(z1 == null) {
-					z1 = 0.;
-				}
-				if(y1 == null) {
-					y1 = 0.;
-				}
-				if(x1 == null) {
-					x1 = 0.;
-				}
-				let l_x = x1;
-				let l_y = y1;
-				let l_z = z1;
-				let px1 = l_x * minv._11 + l_y * minv._21 + l_z * minv._31;
-				let py1 = l_x * minv._12 + l_y * minv._22 + l_z * minv._32;
-				let pz1 = l_x * minv._13 + l_y * minv._23 + l_z * minv._33;
-				l_x = px1;
-				l_y = py1;
-				l_z = pz1;
-				r.lx = l_x;
-				r.ly = l_y;
-				r.lz = l_z;
-				r.normalize();
+				r.transform(minv);
 				if(r.lx != r.lx) {
-					r.px = saveR_px;
-					r.py = saveR_py;
-					r.pz = saveR_pz;
-					r.lx = saveR_lx;
-					r.ly = saveR_ly;
-					r.lz = saveR_lz;
+					r.load(saveR);
 					continue;
 				}
 				let hit = i.shape.rayIntersection(r,i.bestMatch);
 				if(hit < 0) {
-					r.px = saveR_px;
-					r.py = saveR_py;
-					r.pz = saveR_pz;
-					r.lx = saveR_lx;
-					r.ly = saveR_ly;
-					r.lz = saveR_lz;
+					r.load(saveR);
 					continue;
 				}
-				let x2 = r.px + hit * r.lx;
-				let y2 = r.py + hit * r.ly;
-				let z2 = r.pz + hit * r.lz;
-				if(z2 == null) {
-					z2 = 0.;
-				}
-				if(y2 == null) {
-					y2 = 0.;
-				}
-				if(x2 == null) {
-					x2 = 0.;
-				}
-				let hitPoint_x = x2;
-				let hitPoint_y = y2;
-				let hitPoint_z = z2;
-				r.px = saveR_px;
-				r.py = saveR_py;
-				r.pz = saveR_pz;
-				r.lx = saveR_lx;
-				r.ly = saveR_ly;
-				r.lz = saveR_lz;
-				i.hitPoint.x = hitPoint_x;
-				i.hitPoint.y = hitPoint_y;
-				i.hitPoint.z = hitPoint_z;
+				let hitPoint = r.getPoint(hit);
+				r.load(saveR);
+				i.hitPoint.x = hitPoint.x;
+				i.hitPoint.y = hitPoint.y;
+				i.hitPoint.z = hitPoint.z;
 				if(i.priority > priority) {
 					while(this.hitInteractives.length > 0) this.hitInteractives.pop();
 					priority = i.priority;
@@ -14231,124 +12314,23 @@ class h3d_scene_Scene extends h3d_scene_Object {
 					let m = i.invPos;
 					let wfactor = 0.;
 					if(i.preciseShape != null) {
-						let x = r.px;
-						let y = r.py;
-						let z = r.pz;
-						if(z == null) {
-							z = 0.;
-						}
-						if(y == null) {
-							y = 0.;
-						}
-						if(x == null) {
-							x = 0.;
-						}
-						let p_x = x;
-						let p_y = y;
-						let p_z = z;
-						let px = p_x * m._11 + p_y * m._21 + p_z * m._31 + m._41;
-						let py = p_x * m._12 + p_y * m._22 + p_z * m._32 + m._42;
-						let pz = p_x * m._13 + p_y * m._23 + p_z * m._33 + m._43;
-						p_x = px;
-						p_y = py;
-						p_z = pz;
-						r.px = p_x;
-						r.py = p_y;
-						r.pz = p_z;
-						let x1 = r.lx;
-						let y1 = r.ly;
-						let z1 = r.lz;
-						if(z1 == null) {
-							z1 = 0.;
-						}
-						if(y1 == null) {
-							y1 = 0.;
-						}
-						if(x1 == null) {
-							x1 = 0.;
-						}
-						let l_x = x1;
-						let l_y = y1;
-						let l_z = z1;
-						let px1 = l_x * m._11 + l_y * m._21 + l_z * m._31;
-						let py1 = l_x * m._12 + l_y * m._22 + l_z * m._32;
-						let pz1 = l_x * m._13 + l_y * m._23 + l_z * m._33;
-						l_x = px1;
-						l_y = py1;
-						l_z = pz1;
-						r.lx = l_x;
-						r.ly = l_y;
-						r.lz = l_z;
-						r.normalize();
+						r.transform(m);
 						let hit = i.preciseShape.rayIntersection(r,i.bestMatch);
 						if(hit > 0) {
-							let x = r.px + hit * r.lx;
-							let y = r.py + hit * r.ly;
-							let z = r.pz + hit * r.lz;
-							if(z == null) {
-								z = 0.;
-							}
-							if(y == null) {
-								y = 0.;
-							}
-							if(x == null) {
-								x = 0.;
-							}
-							let hitPoint_x = x;
-							let hitPoint_y = y;
-							let hitPoint_z = z;
-							i.hitPoint.x = hitPoint_x;
-							i.hitPoint.y = hitPoint_y;
-							i.hitPoint.z = hitPoint_z;
+							let hitPoint = r.getPoint(hit);
+							i.hitPoint.x = hitPoint.x;
+							i.hitPoint.y = hitPoint.y;
+							i.hitPoint.z = hitPoint.z;
 						} else {
 							wfactor = 1.;
 						}
-						r.px = saveR_px;
-						r.py = saveR_py;
-						r.pz = saveR_pz;
-						r.lx = saveR_lx;
-						r.ly = saveR_ly;
-						r.lz = saveR_lz;
+						r.load(saveR);
 					}
-					let _this = i.hitPoint;
-					let x = _this.x;
-					let y = _this.y;
-					let z = _this.z;
-					let w = _this.w;
-					if(w == null) {
-						w = 1.;
-					}
-					if(z == null) {
-						z = 0.;
-					}
-					if(y == null) {
-						y = 0.;
-					}
-					if(x == null) {
-						x = 0.;
-					}
-					let p_x = x;
-					let p_y = y;
-					let p_z = z;
-					let p_w = w;
-					p_w = 1;
-					let m1 = i.absPos;
-					let px = p_x * m1._11 + p_y * m1._21 + p_z * m1._31 + p_w * m1._41;
-					let py = p_x * m1._12 + p_y * m1._22 + p_z * m1._32 + p_w * m1._42;
-					let pz = p_x * m1._13 + p_y * m1._23 + p_z * m1._33 + p_w * m1._43;
-					p_x = px;
-					p_y = py;
-					p_z = pz;
-					let m2 = this.camera.m;
-					let px1 = p_x * m2._11 + p_y * m2._21 + p_z * m2._31 + p_w * m2._41;
-					let py1 = p_x * m2._12 + p_y * m2._22 + p_z * m2._32 + p_w * m2._42;
-					let pz1 = p_x * m2._13 + p_y * m2._23 + p_z * m2._33 + p_w * m2._43;
-					let iw = 1 / (p_x * m2._14 + p_y * m2._24 + p_z * m2._34 + p_w * m2._44);
-					p_x = px1 * iw;
-					p_y = py1 * iw;
-					p_z = pz1 * iw;
-					p_w = 1;
-					i.hitPoint.w = p_z + wfactor;
+					let p = i.hitPoint.clone();
+					p.w = 1;
+					p.transform3x4(i.absPos);
+					p.project(this.camera.m);
+					i.hitPoint.w = p.z + wfactor;
 				}
 				this.hitInteractives.sort($bind(this,this.sortHitPointByCameraDistance));
 			}
@@ -14393,7 +12375,7 @@ class h3d_scene_Scene extends h3d_scene_Object {
 		this.ctx.elapsedTime = elapsedTime;
 	}
 	render(engine) {
-		if((this.flags & 32) == 0) {
+		if(!this.get_allocated()) {
 			this.onAdd();
 		}
 		let t = engine.getCurrentTarget();
@@ -14413,71 +12395,9 @@ class h3d_scene_Scene extends h3d_scene_Object {
 		this.renderer.start();
 		this.syncRec(this.ctx);
 		this.emitRec(this.ctx);
-		let list = this.ctx.passes;
-		let tmp;
-		if(list == null) {
-			tmp = null;
-		} else {
-			let insize = 1;
-			let nmerges;
-			let psize = 0;
-			let qsize = 0;
-			let p;
-			let q;
-			let e;
-			let tail;
-			while(true) {
-				p = list;
-				list = null;
-				tail = null;
-				nmerges = 0;
-				while(p != null) {
-					++nmerges;
-					q = p;
-					psize = 0;
-					let _g = 0;
-					let _g1 = insize;
-					while(_g < _g1) {
-						++_g;
-						++psize;
-						q = q.next;
-						if(q == null) {
-							break;
-						}
-					}
-					qsize = insize;
-					while(psize > 0 || qsize > 0 && q != null) {
-						if(psize == 0) {
-							e = q;
-							q = q.next;
-							--qsize;
-						} else if(qsize == 0 || q == null || p.pass.passId - q.pass.passId <= 0) {
-							e = p;
-							p = p.next;
-							--psize;
-						} else {
-							e = q;
-							q = q.next;
-							--qsize;
-						}
-						if(tail != null) {
-							tail.next = e;
-						} else {
-							list = e;
-						}
-						tail = e;
-					}
-					p = q;
-				}
-				tail.next = null;
-				if(nmerges <= 1) {
-					break;
-				}
-				insize *= 2;
-			}
-			tmp = list;
-		}
-		this.ctx.passes = tmp;
+		this.ctx.passes = haxe_ds_ListSort.sortSingleLinked(this.ctx.passes,function(p1,p2) {
+			return p1.pass.passId - p2.pass.passId;
+		});
 		let curPass = this.ctx.passes;
 		let passes = [];
 		let passIndex = -1;
@@ -14496,9 +12416,7 @@ class h3d_scene_Scene extends h3d_scene_Object {
 				this.ctx.cachedPassObjects[passIndex] = pobjs;
 			}
 			pobjs.name = curPass.pass.name;
-			let _this = pobjs.passes;
-			_this.current = curPass;
-			_this.discarded = _this.lastDisc = null;
+			pobjs.passes.init(curPass);
 			passes.push(pobjs);
 			curPass = p;
 		}
@@ -14530,13 +12448,12 @@ class h3d_scene_Scene extends h3d_scene_Object {
 			let i = _g++;
 			let p = this.ctx.cachedPassObjects[i];
 			p.name = null;
-			let _this = p.passes;
-			_this.current = null;
-			_this.discarded = _this.lastDisc = null;
+			p.passes.init(null);
 		}
 	}
 }
 h3d_scene_Scene.__name__ = "h3d.scene.Scene";
+h3d_scene_Scene.__interfaces__ = [hxd_InteractiveScene,h3d_IDrawable];
 h3d_scene_Scene.__super__ = h3d_scene_Object;
 Object.assign(h3d_scene_Scene.prototype, {
 	__class__: h3d_scene_Scene
@@ -14552,89 +12469,17 @@ class h3d_scene_fwd_LightSystem extends h3d_scene_LightSystem {
 		this.perPixelLighting = true;
 		this.maxLightsPerObject = 6;
 		super._hx_constructor();
-		let _this = this.ambientLight;
-		_this.x = 0.5;
-		_this.y = 0.5;
-		_this.z = 0.5;
-		_this.w = 1.;
+		this.ambientLight.set(0.5,0.5,0.5);
 		this.ambientShader = new h3d_shader_AmbientLight();
 		this.set_additiveLighting(true);
 	}
 	set_additiveLighting(b) {
-		let value = this.ambientShader;
-		let _this = ((value) instanceof h3d_shader_AmbientLight) ? value : null;
-		_this.constModified = true;
-		return _this.additive__ = b;
+		return hxd_impl_Api.downcast(this.ambientShader,h3d_shader_AmbientLight).set_additive(b);
 	}
 	initLights(ctx) {
 		super.initLights(ctx);
 		if(this.lightCount <= this.maxLightsPerObject) {
-			let list = ctx.lights;
-			let cmp = $bind(this,this.sortLight);
-			let tmp;
-			if(list == null) {
-				tmp = null;
-			} else {
-				let insize = 1;
-				let nmerges;
-				let psize = 0;
-				let qsize = 0;
-				let p;
-				let q;
-				let e;
-				let tail;
-				while(true) {
-					p = list;
-					list = null;
-					tail = null;
-					nmerges = 0;
-					while(p != null) {
-						++nmerges;
-						q = p;
-						psize = 0;
-						let _g = 0;
-						let _g1 = insize;
-						while(_g < _g1) {
-							++_g;
-							++psize;
-							q = q.next;
-							if(q == null) {
-								break;
-							}
-						}
-						qsize = insize;
-						while(psize > 0 || qsize > 0 && q != null) {
-							if(psize == 0) {
-								e = q;
-								q = q.next;
-								--qsize;
-							} else if(qsize == 0 || q == null || cmp(p,q) <= 0) {
-								e = p;
-								p = p.next;
-								--psize;
-							} else {
-								e = q;
-								q = q.next;
-								--qsize;
-							}
-							if(tail != null) {
-								tail.next = e;
-							} else {
-								list = e;
-							}
-							tail = e;
-						}
-						p = q;
-					}
-					tail.next = null;
-					if(nmerges <= 1) {
-						break;
-					}
-					insize *= 2;
-				}
-				tmp = list;
-			}
-			ctx.lights = tmp;
+			ctx.lights = haxe_ds_ListSort.sortSingleLinked(ctx.lights,$bind(this,this.sortLight));
 		}
 	}
 	initGlobals(globals) {
@@ -14656,91 +12501,14 @@ class h3d_scene_fwd_LightSystem extends h3d_scene_LightSystem {
 		if(this.lightCount > this.maxLightsPerObject) {
 			let l = this.ctx.lights;
 			while(l != null) {
-				if((obj.flags & 16) != 0) {
-					let dx = l.absPos._41 - this.ctx.camera.target.x;
-					let dy = l.absPos._42 - this.ctx.camera.target.y;
-					let dz = l.absPos._43 - this.ctx.camera.target.z;
-					if(dz == null) {
-						dz = 0.;
-					}
-					l.objectDistance = dx * dx + dy * dy + dz * dz;
+				if(obj.get_lightCameraCenter()) {
+					l.objectDistance = hxd_Math.distanceSq(l.absPos._41 - this.ctx.camera.target.x,l.absPos._42 - this.ctx.camera.target.y,l.absPos._43 - this.ctx.camera.target.z);
 				} else {
-					let dx = l.absPos._41 - obj.absPos._41;
-					let dy = l.absPos._42 - obj.absPos._42;
-					let dz = l.absPos._43 - obj.absPos._43;
-					if(dz == null) {
-						dz = 0.;
-					}
-					l.objectDistance = dx * dx + dy * dy + dz * dz;
+					l.objectDistance = hxd_Math.distanceSq(l.absPos._41 - obj.absPos._41,l.absPos._42 - obj.absPos._42,l.absPos._43 - obj.absPos._43);
 				}
 				l = l.next;
 			}
-			let list = this.ctx.lights;
-			let cmp = $bind(this,this.sortLight);
-			let tmp;
-			if(list == null) {
-				tmp = null;
-			} else {
-				let insize = 1;
-				let nmerges;
-				let psize = 0;
-				let qsize = 0;
-				let p;
-				let q;
-				let e;
-				let tail;
-				while(true) {
-					p = list;
-					list = null;
-					tail = null;
-					nmerges = 0;
-					while(p != null) {
-						++nmerges;
-						q = p;
-						psize = 0;
-						let _g = 0;
-						let _g1 = insize;
-						while(_g < _g1) {
-							++_g;
-							++psize;
-							q = q.next;
-							if(q == null) {
-								break;
-							}
-						}
-						qsize = insize;
-						while(psize > 0 || qsize > 0 && q != null) {
-							if(psize == 0) {
-								e = q;
-								q = q.next;
-								--qsize;
-							} else if(qsize == 0 || q == null || cmp(p,q) <= 0) {
-								e = p;
-								p = p.next;
-								--psize;
-							} else {
-								e = q;
-								q = q.next;
-								--qsize;
-							}
-							if(tail != null) {
-								tail.next = e;
-							} else {
-								list = e;
-							}
-							tail = e;
-						}
-						p = q;
-					}
-					tail.next = null;
-					if(nmerges <= 1) {
-						break;
-					}
-					insize *= 2;
-				}
-				tmp = list;
-			}
-			this.ctx.lights = tmp;
+			this.ctx.lights = haxe_ds_ListSort.sortSingleLinked(this.ctx.lights,$bind(this,this.sortLight));
 		}
 		shaders = this.ctx.allocShaderList(this.ambientShader,shaders);
 		let l = this.ctx.lights;
@@ -14853,6 +12621,10 @@ class h3d_shader_AmbientLight extends hxsl_Shader {
 	constructor() {
 		super();
 	}
+	set_additive(_v) {
+		this.constModified = true;
+		return this.additive__ = _v;
+	}
 	updateConstants(globals) {
 		this.constBits = 0;
 		if(this.additive__) {
@@ -14893,6 +12665,61 @@ class h3d_shader_Base2d extends hxsl_Shader {
 		this.color__ = new h3d_Vector();
 		this.zValue__ = 0;
 		super._hx_constructor();
+	}
+	set_zValue(_v) {
+		return this.zValue__ = _v;
+	}
+	set_texture(_v) {
+		return this.texture__ = _v;
+	}
+	get_isRelative() {
+		return this.isRelative__;
+	}
+	set_isRelative(_v) {
+		this.constModified = true;
+		return this.isRelative__ = _v;
+	}
+	get_color() {
+		return this.color__;
+	}
+	get_absoluteMatrixA() {
+		return this.absoluteMatrixA__;
+	}
+	get_absoluteMatrixB() {
+		return this.absoluteMatrixB__;
+	}
+	get_filterMatrixA() {
+		return this.filterMatrixA__;
+	}
+	get_filterMatrixB() {
+		return this.filterMatrixB__;
+	}
+	get_hasUVPos() {
+		return this.hasUVPos__;
+	}
+	set_hasUVPos(_v) {
+		this.constModified = true;
+		return this.hasUVPos__ = _v;
+	}
+	get_uvPos() {
+		return this.uvPos__;
+	}
+	get_killAlpha() {
+		return this.killAlpha__;
+	}
+	set_killAlpha(_v) {
+		this.constModified = true;
+		return this.killAlpha__ = _v;
+	}
+	set_pixelAlign(_v) {
+		this.constModified = true;
+		return this.pixelAlign__ = _v;
+	}
+	get_halfPixelInverse() {
+		return this.halfPixelInverse__;
+	}
+	get_viewport() {
+		return this.viewport__;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -14969,18 +12796,22 @@ class h3d_shader_BaseMesh extends hxsl_Shader {
 		this.specularPower__ = 0;
 		this.color__ = new h3d_Vector();
 		super._hx_constructor();
-		let _this = this.color__;
-		_this.x = 1;
-		_this.y = 1;
-		_this.z = 1;
-		_this.w = 1.;
-		let _this1 = this.specularColor__;
-		_this1.x = 1;
-		_this1.y = 1;
-		_this1.z = 1;
-		_this1.w = 1.;
-		this.specularPower__ = 50;
-		this.specularAmount__ = 1;
+		this.get_color().set(1,1,1);
+		this.get_specularColor().set(1,1,1);
+		this.set_specularPower(50);
+		this.set_specularAmount(1);
+	}
+	get_color() {
+		return this.color__;
+	}
+	set_specularPower(_v) {
+		return this.specularPower__ = _v;
+	}
+	set_specularAmount(_v) {
+		return this.specularAmount__ = _v;
+	}
+	get_specularColor() {
+		return this.specularColor__;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15032,6 +12863,39 @@ class h3d_shader_Blur extends h3d_shader_ScreenShader {
 		this.Quality__ = 0;
 		this.cameraInverseViewProj__ = new h3d_Matrix();
 		super._hx_constructor();
+	}
+	set_texture(_v) {
+		return this.texture__ = _v;
+	}
+	set_Quality(_v) {
+		this.constModified = true;
+		return this.Quality__ = _v;
+	}
+	set_isDepth(_v) {
+		this.constModified = true;
+		return this.isDepth__ = _v;
+	}
+	set_values(_v) {
+		return this.values__ = _v;
+	}
+	set_offsets(_v) {
+		return this.offsets__ = _v;
+	}
+	get_pixel() {
+		return this.pixel__;
+	}
+	get_fixedColor() {
+		return this.fixedColor__;
+	}
+	set_isCube(_v) {
+		this.constModified = true;
+		return this.isCube__ = _v;
+	}
+	set_cubeTexture(_v) {
+		return this.cubeTexture__ = _v;
+	}
+	set_cubeDir(_v) {
+		return this.cubeDir__ = _v;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15159,6 +13023,10 @@ class h3d_shader_Buffers {
 		this.vertex = new h3d_shader_ShaderBuffers(s.vertex);
 		this.fragment = new h3d_shader_ShaderBuffers(s.fragment);
 	}
+	grow(s) {
+		this.vertex.grow(s.vertex);
+		this.fragment.grow(s.fragment);
+	}
 }
 h3d_shader_Buffers.__name__ = "h3d.shader.Buffers";
 Object.assign(h3d_shader_Buffers.prototype, {
@@ -15177,11 +13045,10 @@ class h3d_shader_ColorAdd extends hxsl_Shader {
 		}
 		this.color__ = new h3d_Vector();
 		super._hx_constructor();
-		let _this = this.color__;
-		_this.x = (color >> 16 & 255) / 255;
-		_this.y = (color >> 8 & 255) / 255;
-		_this.z = (color & 255) / 255;
-		_this.w = (color >>> 24) / 255;
+		this.get_color().setColor(color);
+	}
+	get_color() {
+		return this.color__;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15215,11 +13082,10 @@ class h3d_shader_ColorKey extends hxsl_Shader {
 		}
 		this.colorKey__ = new h3d_Vector();
 		super._hx_constructor();
-		let _this = this.colorKey__;
-		_this.x = (v >> 16 & 255) / 255;
-		_this.y = (v >> 8 & 255) / 255;
-		_this.z = (v & 255) / 255;
-		_this.w = (v >>> 24) / 255;
+		this.get_colorKey().setColor(v);
+	}
+	get_colorKey() {
+		return this.colorKey__;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15251,10 +13117,13 @@ class h3d_shader_ColorMatrix extends hxsl_Shader {
 		this.matrix__ = new h3d_Matrix();
 		super._hx_constructor();
 		if(m != null) {
-			this.matrix__.loadValues(m);
+			this.get_matrix().loadValues(m);
 		} else {
-			this.matrix__.identity();
+			this.get_matrix().identity();
 		}
+	}
+	get_matrix() {
+		return this.matrix__;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15294,9 +13163,60 @@ class h3d_shader_DirShadow extends hxsl_Shader {
 		this.pcfQuality__ = 0;
 		this.shadowPower__ = 0;
 		super._hx_constructor();
-		this.poissonDiskLow__ = [new h3d_Vector(-0.942,-0.399),new h3d_Vector(0.945,-0.768),new h3d_Vector(-0.094,-0.929),new h3d_Vector(0.344,0.293)];
-		this.poissonDiskHigh__ = [new h3d_Vector(-0.326,-0.406),new h3d_Vector(-0.840,-0.074),new h3d_Vector(-0.696,0.457),new h3d_Vector(-0.203,0.621),new h3d_Vector(0.962,-0.195),new h3d_Vector(0.473,-0.480),new h3d_Vector(0.519,0.767),new h3d_Vector(0.185,-0.893),new h3d_Vector(0.507,0.064),new h3d_Vector(0.896,0.412),new h3d_Vector(-0.322,-0.933),new h3d_Vector(-0.792,-0.598)];
-		this.poissonDiskVeryHigh__ = [new h3d_Vector(-0.613392,0.617481),new h3d_Vector(0.170019,-0.040254),new h3d_Vector(-0.299417,0.791925),new h3d_Vector(0.645680,0.493210),new h3d_Vector(-0.651784,0.717887),new h3d_Vector(0.421003,0.027070),new h3d_Vector(-0.817194,-0.271096),new h3d_Vector(-0.705374,-0.668203),new h3d_Vector(0.977050,-0.108615),new h3d_Vector(0.063326,0.142369),new h3d_Vector(0.203528,0.214331),new h3d_Vector(-0.667531,0.326090),new h3d_Vector(-0.098422,-0.295755),new h3d_Vector(-0.885922,0.215369),new h3d_Vector(0.566637,0.605213),new h3d_Vector(0.039766,-0.396100),new h3d_Vector(0.751946,0.453352),new h3d_Vector(0.078707,-0.715323),new h3d_Vector(-0.075838,-0.529344),new h3d_Vector(0.724479,-0.580798),new h3d_Vector(0.222999,-0.215125),new h3d_Vector(-0.467574,-0.405438),new h3d_Vector(-0.248268,-0.814753),new h3d_Vector(0.354411,-0.887570),new h3d_Vector(0.175817,0.382366),new h3d_Vector(0.487472,-0.063082),new h3d_Vector(-0.084078,0.898312),new h3d_Vector(0.488876,-0.783441),new h3d_Vector(0.470016,0.217933),new h3d_Vector(-0.696890,-0.549791),new h3d_Vector(-0.149693,0.605762),new h3d_Vector(0.034211,0.979980),new h3d_Vector(0.503098,-0.308878),new h3d_Vector(-0.016205,-0.872921),new h3d_Vector(0.385784,-0.393902),new h3d_Vector(-0.146886,-0.859249),new h3d_Vector(0.643361,0.164098),new h3d_Vector(0.634388,-0.049471),new h3d_Vector(-0.688894,0.007843),new h3d_Vector(0.464034,-0.188818),new h3d_Vector(-0.440840,0.137486),new h3d_Vector(0.364483,0.511704),new h3d_Vector(0.034028,0.325968),new h3d_Vector(0.099094,-0.308023),new h3d_Vector(0.693960,-0.366253),new h3d_Vector(0.678884,-0.204688),new h3d_Vector(0.001801,0.780328),new h3d_Vector(0.145177,-0.898984),new h3d_Vector(0.062655,-0.611866),new h3d_Vector(0.315226,-0.604297),new h3d_Vector(-0.780145,0.486251),new h3d_Vector(-0.371868,0.882138),new h3d_Vector(0.200476,0.494430),new h3d_Vector(-0.494552,-0.711051),new h3d_Vector(0.612476,0.705252),new h3d_Vector(-0.578845,-0.768792),new h3d_Vector(-0.772454,-0.090976),new h3d_Vector(0.504440,0.372295),new h3d_Vector(0.155736,0.065157),new h3d_Vector(0.391522,0.849605),new h3d_Vector(-0.620106,-0.328104),new h3d_Vector(0.789239,-0.419965),new h3d_Vector(-0.545396,0.538133),new h3d_Vector(-0.178564,-0.596057)];
+		this.set_poissonDiskLow([new h3d_Vector(-0.942,-0.399),new h3d_Vector(0.945,-0.768),new h3d_Vector(-0.094,-0.929),new h3d_Vector(0.344,0.293)]);
+		this.set_poissonDiskHigh([new h3d_Vector(-0.326,-0.406),new h3d_Vector(-0.840,-0.074),new h3d_Vector(-0.696,0.457),new h3d_Vector(-0.203,0.621),new h3d_Vector(0.962,-0.195),new h3d_Vector(0.473,-0.480),new h3d_Vector(0.519,0.767),new h3d_Vector(0.185,-0.893),new h3d_Vector(0.507,0.064),new h3d_Vector(0.896,0.412),new h3d_Vector(-0.322,-0.933),new h3d_Vector(-0.792,-0.598)]);
+		this.set_poissonDiskVeryHigh([new h3d_Vector(-0.613392,0.617481),new h3d_Vector(0.170019,-0.040254),new h3d_Vector(-0.299417,0.791925),new h3d_Vector(0.645680,0.493210),new h3d_Vector(-0.651784,0.717887),new h3d_Vector(0.421003,0.027070),new h3d_Vector(-0.817194,-0.271096),new h3d_Vector(-0.705374,-0.668203),new h3d_Vector(0.977050,-0.108615),new h3d_Vector(0.063326,0.142369),new h3d_Vector(0.203528,0.214331),new h3d_Vector(-0.667531,0.326090),new h3d_Vector(-0.098422,-0.295755),new h3d_Vector(-0.885922,0.215369),new h3d_Vector(0.566637,0.605213),new h3d_Vector(0.039766,-0.396100),new h3d_Vector(0.751946,0.453352),new h3d_Vector(0.078707,-0.715323),new h3d_Vector(-0.075838,-0.529344),new h3d_Vector(0.724479,-0.580798),new h3d_Vector(0.222999,-0.215125),new h3d_Vector(-0.467574,-0.405438),new h3d_Vector(-0.248268,-0.814753),new h3d_Vector(0.354411,-0.887570),new h3d_Vector(0.175817,0.382366),new h3d_Vector(0.487472,-0.063082),new h3d_Vector(-0.084078,0.898312),new h3d_Vector(0.488876,-0.783441),new h3d_Vector(0.470016,0.217933),new h3d_Vector(-0.696890,-0.549791),new h3d_Vector(-0.149693,0.605762),new h3d_Vector(0.034211,0.979980),new h3d_Vector(0.503098,-0.308878),new h3d_Vector(-0.016205,-0.872921),new h3d_Vector(0.385784,-0.393902),new h3d_Vector(-0.146886,-0.859249),new h3d_Vector(0.643361,0.164098),new h3d_Vector(0.634388,-0.049471),new h3d_Vector(-0.688894,0.007843),new h3d_Vector(0.464034,-0.188818),new h3d_Vector(-0.440840,0.137486),new h3d_Vector(0.364483,0.511704),new h3d_Vector(0.034028,0.325968),new h3d_Vector(0.099094,-0.308023),new h3d_Vector(0.693960,-0.366253),new h3d_Vector(0.678884,-0.204688),new h3d_Vector(0.001801,0.780328),new h3d_Vector(0.145177,-0.898984),new h3d_Vector(0.062655,-0.611866),new h3d_Vector(0.315226,-0.604297),new h3d_Vector(-0.780145,0.486251),new h3d_Vector(-0.371868,0.882138),new h3d_Vector(0.200476,0.494430),new h3d_Vector(-0.494552,-0.711051),new h3d_Vector(0.612476,0.705252),new h3d_Vector(-0.578845,-0.768792),new h3d_Vector(-0.772454,-0.090976),new h3d_Vector(0.504440,0.372295),new h3d_Vector(0.155736,0.065157),new h3d_Vector(0.391522,0.849605),new h3d_Vector(-0.620106,-0.328104),new h3d_Vector(0.789239,-0.419965),new h3d_Vector(-0.545396,0.538133),new h3d_Vector(-0.178564,-0.596057)]);
+	}
+	set_enable(_v) {
+		this.constModified = true;
+		return this.enable__ = _v;
+	}
+	set_USE_ESM(_v) {
+		this.constModified = true;
+		return this.USE_ESM__ = _v;
+	}
+	set_shadowPower(_v) {
+		return this.shadowPower__ = _v;
+	}
+	set_USE_PCF(_v) {
+		this.constModified = true;
+		return this.USE_PCF__ = _v;
+	}
+	set_pcfQuality(_v) {
+		this.constModified = true;
+		return this.pcfQuality__ = _v;
+	}
+	set_pcfScale(_v) {
+		return this.pcfScale__ = _v;
+	}
+	get_shadowRes() {
+		return this.shadowRes__;
+	}
+	get_shadowMap() {
+		return this.shadowMap__;
+	}
+	set_shadowMap(_v) {
+		this.constModified = true;
+		return this.shadowMap__ = _v;
+	}
+	set_shadowMapChannel(v) {
+		this.constModified = true;
+		return this.shadowMapChannel__ = v;
+	}
+	set_shadowProj(_v) {
+		return this.shadowProj__ = _v;
+	}
+	set_shadowBias(_v) {
+		return this.shadowBias__ = _v;
+	}
+	set_poissonDiskLow(_v) {
+		return this.poissonDiskLow__ = _v;
+	}
+	set_poissonDiskHigh(_v) {
+		return this.poissonDiskHigh__ = _v;
+	}
+	set_poissonDiskVeryHigh(_v) {
+		return this.poissonDiskVeryHigh__ = _v;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15317,13 +13237,13 @@ class h3d_shader_DirShadow extends hxsl_Shader {
 		if(this.shadowMap__ == null) {
 			this.shadowMapChannel__ = hxsl_Channel.Unknown;
 		} else if(this.shadowMapChannel__ == hxsl_Channel.Unknown) {
-			if(this.shadowMap__.format == h3d_mat_Texture.nativeFormat) {
+			if(hxsl_ChannelTools.isPackedFormat(this.shadowMap__)) {
 				this.shadowMapChannel__ = hxsl_Channel.PackedFloat;
 			} else {
 				throw haxe_Exception.thrown("shadowMap" + "Channel is not set");
 			}
 		}
-		this.constBits |= (globals.allocChannelID(this.shadowMap__) << 3 | this.shadowMapChannel__._hx_index) << 11;
+		this.constBits |= (globals.allocChannelID(this.shadowMap__) << 3 | Type.enumIndex(this.shadowMapChannel__)) << 11;
 		this.updateConstantsFinal(globals);
 	}
 	getParamValue(index) {
@@ -15393,8 +13313,14 @@ class h3d_shader_LineShader extends hxsl_Shader {
 		this.width__ = 0;
 		this.lengthScale__ = 0;
 		super._hx_constructor();
-		this.width__ = width;
-		this.lengthScale__ = lengthScale;
+		this.set_width(width);
+		this.set_lengthScale(lengthScale);
+	}
+	set_lengthScale(_v) {
+		return this.lengthScale__ = _v;
+	}
+	set_width(_v) {
+		return this.width__ = _v;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15429,6 +13355,12 @@ Object.assign(h3d_shader_LineShader.prototype, {
 class h3d_shader_MinMaxShader extends h3d_shader_ScreenShader {
 	constructor() {
 		super();
+	}
+	set_texA(_v) {
+		return this.texA__ = _v;
+	}
+	set_texB(_v) {
+		return this.texB__ = _v;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15512,7 +13444,10 @@ Object.assign(h3d_shader_CubeMinMaxShader.prototype, {
 class h3d_shader_NormalMap extends hxsl_Shader {
 	constructor(texture) {
 		super();
-		this.texture__ = texture;
+		this.set_texture(texture);
+	}
+	set_texture(_v) {
+		return this.texture__ = _v;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15614,8 +13549,11 @@ class h3d_shader_SkinBase extends hxsl_Shader {
 		this.bonesMatrixes__ = [];
 		this.MaxBones__ = 0;
 		super._hx_constructor();
+		this.set_MaxBones(34);
+	}
+	set_MaxBones(_v) {
 		this.constModified = true;
-		this.MaxBones__ = 34;
+		return this.MaxBones__ = _v;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15712,7 +13650,10 @@ Object.assign(h3d_shader_SkinTangent.prototype, {
 class h3d_shader_SpecularTexture extends hxsl_Shader {
 	constructor(tex) {
 		super();
-		this.texture__ = tex;
+		this.set_texture(tex);
+	}
+	set_texture(_v) {
+		return this.texture__ = _v;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15743,8 +13684,18 @@ class h3d_shader_Texture extends hxsl_Shader {
 	_hx_constructor(tex) {
 		this.killAlphaThreshold__ = 0;
 		super._hx_constructor();
-		this.texture__ = tex;
-		this.killAlphaThreshold__ = h3d_mat_Defaults.defaultKillAlphaThreshold;
+		this.set_texture(tex);
+		this.set_killAlphaThreshold(h3d_mat_Defaults.defaultKillAlphaThreshold);
+	}
+	set_killAlpha(_v) {
+		this.constModified = true;
+		return this.killAlpha__ = _v;
+	}
+	set_killAlphaThreshold(_v) {
+		return this.killAlphaThreshold__ = _v;
+	}
+	set_texture(_v) {
+		return this.texture__ = _v;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15810,32 +13761,14 @@ class h3d_shader_UVDelta extends hxsl_Shader {
 		this.uvScale__ = new h3d_Vector();
 		this.uvDelta__ = new h3d_Vector();
 		super._hx_constructor();
-		let _this = this.uvDelta__;
-		let x = dx;
-		let y = dy;
-		if(dy == null) {
-			y = 0.;
-		}
-		if(dx == null) {
-			x = 0.;
-		}
-		_this.x = x;
-		_this.y = y;
-		_this.z = 0.;
-		_this.w = 1.;
-		let _this1 = this.uvScale__;
-		let x1 = sx;
-		let y1 = sy;
-		if(sy == null) {
-			y1 = 0.;
-		}
-		if(sx == null) {
-			x1 = 0.;
-		}
-		_this1.x = x1;
-		_this1.y = y1;
-		_this1.z = 0.;
-		_this1.w = 1.;
+		this.get_uvDelta().set(dx,dy);
+		this.get_uvScale().set(sx,sy);
+	}
+	get_uvDelta() {
+		return this.uvDelta__;
+	}
+	get_uvScale() {
+		return this.uvScale__;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15899,29 +13832,18 @@ class h3d_shader_VolumeDecal extends hxsl_Shader {
 		this.normal__ = new h3d_Vector();
 		this.scale__ = new h3d_Vector();
 		super._hx_constructor();
-		let _this = this.normal__;
-		_this.x = 0;
-		_this.y = 0;
-		_this.z = 1;
-		_this.w = 1.;
-		let _this1 = this.tangent__;
-		_this1.x = 1;
-		_this1.y = 0;
-		_this1.z = 0;
-		_this1.w = 1.;
-		let _this2 = this.scale__;
-		let x = 1 / objectWidth;
-		let y = 1 / objectHeight;
-		if(y == null) {
-			y = 0.;
-		}
-		if(x == null) {
-			x = 0.;
-		}
-		_this2.x = x;
-		_this2.y = y;
-		_this2.z = 0.;
-		_this2.w = 1.;
+		this.get_normal().set(0,0,1);
+		this.get_tangent().set(1,0,0);
+		this.get_scale().set(1 / objectWidth,1 / objectHeight);
+	}
+	get_scale() {
+		return this.scale__;
+	}
+	get_normal() {
+		return this.normal__;
+	}
+	get_tangent() {
+		return this.tangent__;
 	}
 	updateConstants(globals) {
 		this.constBits = 0;
@@ -15997,6 +13919,9 @@ class haxe_Exception extends Error {
 	toString() {
 		return this.get_message();
 	}
+	__shiftStack() {
+		this.__skipStack++;
+	}
 	get_message() {
 		return this.message;
 	}
@@ -16060,6 +13985,11 @@ class haxe_MainEvent {
 		this.f = f;
 		this.priority = p;
 		this.nextRun = -Infinity;
+	}
+	call() {
+		if(this.f != null) {
+			this.f();
+		}
 	}
 }
 haxe_MainEvent.__name__ = "haxe.MainEvent";
@@ -16162,16 +14092,14 @@ class haxe_MainLoop {
 	static tick() {
 		haxe_MainLoop.sortEvents();
 		let e = haxe_MainLoop.pending;
-		let now = HxOverrides.now() / 1000;
+		let now = haxe_Timer.stamp();
 		let wait = 1e9;
 		while(e != null) {
 			let next = e.next;
 			let wt = e.nextRun - now;
 			if(wt <= 0) {
 				wait = 0;
-				if(e.f != null) {
-					e.f();
-				}
+				e.call();
 			} else if(wait > wt) {
 				wait = wt;
 			}
@@ -16205,6 +14133,9 @@ class haxe_Timer {
 		};
 		return t;
 	}
+	static stamp() {
+		return HxOverrides.now() / 1000;
+	}
 }
 haxe_Timer.__name__ = "haxe.Timer";
 Object.assign(haxe_Timer.prototype, {
@@ -16214,6 +14145,7 @@ class haxe_ValueException extends haxe_Exception {
 	constructor(value,previous,native) {
 		super(String(value),previous,native);
 		this.value = value;
+		this.__shiftStack();
 	}
 	unwrap() {
 		return this.value;
@@ -16232,6 +14164,12 @@ class haxe_io_Bytes {
 		data.hxBytes = this;
 		data.bytes = this.b;
 	}
+	get(pos) {
+		return this.b[pos];
+	}
+	set(pos,v) {
+		this.b[pos] = v;
+	}
 	blit(pos,src,srcpos,len) {
 		if(pos < 0 || srcpos < 0 || len < 0 || pos + len > this.length || srcpos + len > src.length) {
 			throw haxe_Exception.thrown(haxe_io_Error.OutsideBounds);
@@ -16242,16 +14180,17 @@ class haxe_io_Bytes {
 			this.b.set(src.b.subarray(srcpos,srcpos + len),pos);
 		}
 	}
-	getInt32(pos) {
+	initData() {
 		if(this.data == null) {
 			this.data = new DataView(this.b.buffer,this.b.byteOffset,this.b.byteLength);
 		}
+	}
+	getInt32(pos) {
+		this.initData();
 		return this.data.getInt32(pos,true);
 	}
 	setInt32(pos,v) {
-		if(this.data == null) {
-			this.data = new DataView(this.b.buffer,this.b.byteOffset,this.b.byteLength);
-		}
+		this.initData();
 		this.data.setInt32(pos,v,true);
 	}
 	getString(pos,len,encoding) {
@@ -16298,6 +14237,9 @@ class haxe_io_Bytes {
 		}
 		return s;
 	}
+	static alloc(length) {
+		return new haxe_io_Bytes(new ArrayBuffer(length));
+	}
 	static ofString(s,encoding) {
 		if(encoding == haxe_io_Encoding.RawNative) {
 			let buf = new Uint8Array(s.length << 1);
@@ -16305,7 +14247,7 @@ class haxe_io_Bytes {
 			let _g1 = s.length;
 			while(_g < _g1) {
 				let i = _g++;
-				let c = s.charCodeAt(i);
+				let c = StringTools.fastCodeAt(s,i);
 				buf[i << 1] = c & 255;
 				buf[i << 1 | 1] = c >> 8;
 			}
@@ -16314,9 +14256,9 @@ class haxe_io_Bytes {
 		let a = [];
 		let i = 0;
 		while(i < s.length) {
-			let c = s.charCodeAt(i++);
+			let c = StringTools.fastCodeAt(s,i++);
 			if(55296 <= c && c <= 56319) {
-				c = c - 55232 << 10 | s.charCodeAt(i++) & 1023;
+				c = c - 55232 << 10 | StringTools.fastCodeAt(s,i++) & 1023;
 			}
 			if(c <= 127) {
 				a.push(c);
@@ -16380,7 +14322,7 @@ class haxe_crypto_BaseCode {
 		let _g2 = this.base.length;
 		while(_g1 < _g2) {
 			let i = _g1++;
-			tbl[this.base.b[i]] = i;
+			tbl[this.base.get(i)] = i;
 		}
 		this.tbl = tbl;
 	}
@@ -16391,7 +14333,7 @@ class haxe_crypto_BaseCode {
 		}
 		let tbl = this.tbl;
 		let size = b.length * nbits >> 3;
-		let out = new haxe_io_Bytes(new ArrayBuffer(size));
+		let out = haxe_io_Bytes.alloc(size);
 		let buf = 0;
 		let curbits = 0;
 		let pin = 0;
@@ -16400,14 +14342,14 @@ class haxe_crypto_BaseCode {
 			while(curbits < 8) {
 				curbits += nbits;
 				buf <<= nbits;
-				let i = tbl[b.b[pin++]];
+				let i = tbl[b.get(pin++)];
 				if(i == -1) {
 					throw haxe_Exception.thrown("BaseCode : invalid encoded char");
 				}
 				buf |= i;
 			}
 			curbits -= 8;
-			out.b[pout++] = buf >> curbits & 255;
+			out.set(pout++,buf >> curbits & 255);
 		}
 		return out;
 	}
@@ -16572,7 +14514,7 @@ class haxe_crypto_Md5 {
 		let max = str1.length;
 		let l = max * 8;
 		while(i < max) {
-			blks[i >> 2] |= str1.b[i] << (l + i) % 4 * 8;
+			blks[i >> 2] |= str1.get(i) << (l + i) % 4 * 8;
 			++i;
 		}
 		blks[i >> 2] |= 128 << (l + i) % 4 * 8;
@@ -16602,7 +14544,7 @@ class haxe_ds_ArraySort {
 				let i = _g++;
 				let j = i;
 				while(j > from) {
-					if(cmp(a[j],a[j - 1]) < 0) {
+					if(haxe_ds_ArraySort.compare(a,cmp,j,j - 1) < 0) {
 						haxe_ds_ArraySort.swap(a,j - 1,j);
 					} else {
 						break;
@@ -16626,7 +14568,7 @@ class haxe_ds_ArraySort {
 				return;
 			}
 			if(len1 + len2 == 2) {
-				if(cmp(a[pivot],a[from]) < 0) {
+				if(haxe_ds_ArraySort.compare(a,cmp,pivot,from) < 0) {
 					haxe_ds_ArraySort.swap(a,pivot,from);
 				}
 				return;
@@ -16688,7 +14630,7 @@ class haxe_ds_ArraySort {
 		while(len > 0) {
 			half = len >> 1;
 			mid = from + half;
-			if(cmp(a[val],a[mid]) < 0) {
+			if(haxe_ds_ArraySort.compare(a,cmp,val,mid) < 0) {
 				len = half;
 			} else {
 				from = mid + 1;
@@ -16704,7 +14646,7 @@ class haxe_ds_ArraySort {
 		while(len > 0) {
 			half = len >> 1;
 			mid = from + half;
-			if(cmp(a[mid],a[val]) < 0) {
+			if(haxe_ds_ArraySort.compare(a,cmp,mid,val) < 0) {
 				from = mid + 1;
 				len = len - half - 1;
 			} else {
@@ -16717,6 +14659,9 @@ class haxe_ds_ArraySort {
 		let tmp = a[i];
 		a[i] = a[j];
 		a[j] = tmp;
+	}
+	static compare(a,cmp,i,j) {
+		return cmp(a[i],a[j]);
 	}
 }
 haxe_ds_ArraySort.__name__ = "haxe.ds.ArraySort";
@@ -16800,6 +14745,7 @@ class haxe_ds_BalancedTree {
 	}
 }
 haxe_ds_BalancedTree.__name__ = "haxe.ds.BalancedTree";
+haxe_ds_BalancedTree.__interfaces__ = [haxe_IMap];
 Object.assign(haxe_ds_BalancedTree.prototype, {
 	__class__: haxe_ds_BalancedTree
 });
@@ -16838,7 +14784,7 @@ class haxe_ds_EnumValueMap extends haxe_ds_BalancedTree {
 		super();
 	}
 	compare(k1,k2) {
-		let d = k1._hx_index - k2._hx_index;
+		let d = Type.enumIndex(k1) - Type.enumIndex(k2);
 		if(d != 0) {
 			return d;
 		}
@@ -16876,6 +14822,7 @@ class haxe_ds_EnumValueMap extends haxe_ds_BalancedTree {
 	}
 }
 haxe_ds_EnumValueMap.__name__ = "haxe.ds.EnumValueMap";
+haxe_ds_EnumValueMap.__interfaces__ = [haxe_IMap];
 haxe_ds_EnumValueMap.__super__ = haxe_ds_BalancedTree;
 Object.assign(haxe_ds_EnumValueMap.prototype, {
 	__class__: haxe_ds_EnumValueMap
@@ -16923,6 +14870,9 @@ class haxe_ds_List {
 		}
 		return false;
 	}
+	iterator() {
+		return new haxe_ds__$List_ListIterator(this.h);
+	}
 }
 haxe_ds_List.__name__ = "haxe.ds.List";
 Object.assign(haxe_ds_List.prototype, {
@@ -16938,20 +14888,109 @@ haxe_ds__$List_ListNode.__name__ = "haxe.ds._List.ListNode";
 Object.assign(haxe_ds__$List_ListNode.prototype, {
 	__class__: haxe_ds__$List_ListNode
 });
+class haxe_ds__$List_ListIterator {
+	constructor(head) {
+		this.head = head;
+	}
+	hasNext() {
+		return this.head != null;
+	}
+	next() {
+		let val = this.head.item;
+		this.head = this.head.next;
+		return val;
+	}
+}
+haxe_ds__$List_ListIterator.__name__ = "haxe.ds._List.ListIterator";
+Object.assign(haxe_ds__$List_ListIterator.prototype, {
+	__class__: haxe_ds__$List_ListIterator
+});
+class haxe_ds_ListSort {
+	static sortSingleLinked(list,cmp) {
+		if(list == null) {
+			return null;
+		}
+		let insize = 1;
+		let nmerges;
+		let psize = 0;
+		let qsize = 0;
+		let p;
+		let q;
+		let e;
+		let tail;
+		while(true) {
+			p = list;
+			list = null;
+			tail = null;
+			nmerges = 0;
+			while(p != null) {
+				++nmerges;
+				q = p;
+				psize = 0;
+				let _g = 0;
+				let _g1 = insize;
+				while(_g < _g1) {
+					++_g;
+					++psize;
+					q = q.next;
+					if(q == null) {
+						break;
+					}
+				}
+				qsize = insize;
+				while(psize > 0 || qsize > 0 && q != null) {
+					if(psize == 0) {
+						e = q;
+						q = q.next;
+						--qsize;
+					} else if(qsize == 0 || q == null || cmp(p,q) <= 0) {
+						e = p;
+						p = p.next;
+						--psize;
+					} else {
+						e = q;
+						q = q.next;
+						--qsize;
+					}
+					if(tail != null) {
+						tail.next = e;
+					} else {
+						list = e;
+					}
+					tail = e;
+				}
+				p = q;
+			}
+			tail.next = null;
+			if(nmerges <= 1) {
+				break;
+			}
+			insize *= 2;
+		}
+		return list;
+	}
+}
+haxe_ds_ListSort.__name__ = "haxe.ds.ListSort";
 class haxe_ds_ObjectMap {
 	constructor() {
 		this.h = { __keys__ : { }};
 	}
 	set(key,value) {
-		let id = key.__id__;
+		let id = haxe_ds_ObjectMap.getId(key);
 		if(id == null) {
-			id = (key.__id__ = $global.$haxeUID++);
+			id = haxe_ds_ObjectMap.assignId(key);
 		}
 		this.h[id] = value;
 		this.h.__keys__[id] = key;
 	}
+	get(key) {
+		return this.h[haxe_ds_ObjectMap.getId(key)];
+	}
+	exists(key) {
+		return this.h.__keys__[haxe_ds_ObjectMap.getId(key)] != null;
+	}
 	remove(key) {
-		let id = key.__id__;
+		let id = haxe_ds_ObjectMap.getId(key);
 		if(this.h.__keys__[id] == null) {
 			return false;
 		}
@@ -16968,8 +15007,15 @@ class haxe_ds_ObjectMap {
 		}
 		return new haxe_iterators_ArrayIterator(a);
 	}
+	static assignId(obj) {
+		return (obj.__id__ = js_Lib.getNextHaxeUID());
+	}
+	static getId(obj) {
+		return obj.__id__;
+	}
 }
 haxe_ds_ObjectMap.__name__ = "haxe.ds.ObjectMap";
+haxe_ds_ObjectMap.__interfaces__ = [haxe_IMap];
 Object.assign(haxe_ds_ObjectMap.prototype, {
 	__class__: haxe_ds_ObjectMap
 });
@@ -16990,14 +15036,14 @@ class haxe_io_Input {
 				--k;
 			}
 		} catch( _g ) {
-			if(!((haxe_Exception.caught(_g).unwrap()) instanceof haxe_io_Eof)) {
+			if(!Std.isOfType(haxe_Exception.caught(_g).unwrap(),haxe_io_Eof)) {
 				throw _g;
 			}
 		}
 		return len - k;
 	}
 	read(nbytes) {
-		let s = new haxe_io_Bytes(new ArrayBuffer(nbytes));
+		let s = haxe_io_Bytes.alloc(nbytes);
 		let p = 0;
 		while(nbytes > 0) {
 			let k = this.readBytes(s,p,nbytes);
@@ -17184,18 +15230,10 @@ class help_Grid {
 			let _g2 = numRows + 1;
 			while(_g1 < _g2) {
 				let row = _g1++;
-				let x = col * cellWidth;
-				graphics.flush();
-				graphics.addVertex(x,0,graphics.curR,graphics.curG,graphics.curB,graphics.curA,x * graphics.ma + 0 * graphics.mc + graphics.mx,x * graphics.mb + 0 * graphics.md + graphics.my);
-				let x1 = col * cellWidth;
-				let y = cellHeight * numRows;
-				graphics.addVertex(x1,y,graphics.curR,graphics.curG,graphics.curB,graphics.curA,x1 * graphics.ma + y * graphics.mc + graphics.mx,x1 * graphics.mb + y * graphics.md + graphics.my);
-				let y1 = row * cellHeight;
-				graphics.flush();
-				graphics.addVertex(0,y1,graphics.curR,graphics.curG,graphics.curB,graphics.curA,0 * graphics.ma + y1 * graphics.mc + graphics.mx,0 * graphics.mb + y1 * graphics.md + graphics.my);
-				let x2 = cellWidth * numColumns;
-				let y2 = row * cellHeight;
-				graphics.addVertex(x2,y2,graphics.curR,graphics.curG,graphics.curB,graphics.curA,x2 * graphics.ma + y2 * graphics.mc + graphics.mx,x2 * graphics.mb + y2 * graphics.md + graphics.my);
+				graphics.moveTo(col * cellWidth,0);
+				graphics.lineTo(col * cellWidth,cellHeight * numRows);
+				graphics.moveTo(0,row * cellHeight);
+				graphics.lineTo(cellWidth * numColumns,row * cellHeight);
 			}
 		}
 	}
@@ -17209,6 +15247,9 @@ class hxd_BitmapData {
 			canvas.height = height;
 			this.ctx = canvas.getContext("2d",null);
 		}
+	}
+	toNative() {
+		return this.ctx;
 	}
 }
 hxd_BitmapData.__name__ = "hxd.BitmapData";
@@ -17303,6 +15344,9 @@ class hxd__$FloatBuffer_Float32Expand {
 	}
 }
 class hxd_Key {
+	static getFrame() {
+		return hxd_Timer.frameCount + 1;
+	}
 	static initialize() {
 		if(hxd_Key.initDone) {
 			hxd_Key.dispose();
@@ -17322,31 +15366,106 @@ class hxd_Key {
 		switch(e.kind._hx_index) {
 		case 0:
 			if(e.button < 5) {
-				hxd_Key.keyPressed[e.button] = hxd_Timer.frameCount + 1;
+				hxd_Key.keyPressed[e.button] = hxd_Key.getFrame();
 			}
 			break;
 		case 1:
 			if(e.button < 5) {
-				hxd_Key.keyPressed[e.button] = -(hxd_Timer.frameCount + 1);
+				hxd_Key.keyPressed[e.button] = -hxd_Key.getFrame();
 			}
 			break;
 		case 5:
-			hxd_Key.keyPressed[e.wheelDelta > 0 ? 6 : 5] = hxd_Timer.frameCount + 1;
+			hxd_Key.keyPressed[e.wheelDelta > 0 ? 6 : 5] = hxd_Key.getFrame();
 			break;
 		case 8:
 			if(!hxd_Key.ALLOW_KEY_REPEAT && hxd_Key.keyPressed[e.keyCode] > 0) {
 				return;
 			}
-			hxd_Key.keyPressed[e.keyCode] = hxd_Timer.frameCount + 1;
+			hxd_Key.keyPressed[e.keyCode] = hxd_Key.getFrame();
 			break;
 		case 9:
-			hxd_Key.keyPressed[e.keyCode] = -(hxd_Timer.frameCount + 1);
+			hxd_Key.keyPressed[e.keyCode] = -hxd_Key.getFrame();
 			break;
 		default:
 		}
 	}
 }
 hxd_Key.__name__ = "hxd.Key";
+class hxd_Math {
+	static get_POSITIVE_INFINITY() {
+		return Infinity;
+	}
+	static get_NEGATIVE_INFINITY() {
+		return -Infinity;
+	}
+	static floor(f) {
+		return Math.floor(f);
+	}
+	static ceil(f) {
+		return Math.ceil(f);
+	}
+	static round(f) {
+		return Math.round(f);
+	}
+	static clamp(f,min,max) {
+		if(max == null) {
+			max = 1.;
+		}
+		if(min == null) {
+			min = 0.;
+		}
+		if(f < min) {
+			return min;
+		} else if(f > max) {
+			return max;
+		} else {
+			return f;
+		}
+	}
+	static cos(f) {
+		return Math.cos(f);
+	}
+	static sin(f) {
+		return Math.sin(f);
+	}
+	static sqrt(f) {
+		return Math.sqrt(f);
+	}
+	static invSqrt(f) {
+		return 1. / hxd_Math.sqrt(f);
+	}
+	static abs(f) {
+		if(f < 0) {
+			return -f;
+		} else {
+			return f;
+		}
+	}
+	static max(a,b) {
+		if(a < b) {
+			return b;
+		} else {
+			return a;
+		}
+	}
+	static min(a,b) {
+		if(a > b) {
+			return b;
+		} else {
+			return a;
+		}
+	}
+	static lerp(a,b,k) {
+		return a + k * (b - a);
+	}
+	static distanceSq(dx,dy,dz) {
+		if(dz == null) {
+			dz = 0.;
+		}
+		return dx * dx + dy * dy + dz * dz;
+	}
+}
+hxd_Math.__name__ = "hxd.Math";
 var hxd_Flags = $hxEnums["hxd.Flags"] = { __ename__ : true, __constructs__ : ["ReadOnly","AlphaPremultiplied","FlipY"]
 	,ReadOnly: {_hx_index:0,__enum__:"hxd.Flags",toString:$estr}
 	,AlphaPremultiplied: {_hx_index:1,__enum__:"hxd.Flags",toString:$estr}
@@ -17365,6 +15484,9 @@ class hxd_Pixels {
 		this.offset = offset;
 		this.flags = 0;
 	}
+	get_format() {
+		return this.innerFormat;
+	}
 	set_innerFormat(fmt) {
 		this.innerFormat = fmt;
 		this.stride = hxd_Pixels.calcStride(this.width,fmt);
@@ -17372,14 +15494,19 @@ class hxd_Pixels {
 		return fmt;
 	}
 	invalidFormat() {
-		throw haxe_Exception.thrown("Unsupported format for this operation : " + Std.string(this.innerFormat));
+		throw haxe_Exception.thrown("Unsupported format for this operation : " + Std.string(this.get_format()));
 	}
 	copyInner() {
 		let old = this.bytes;
-		this.bytes = new haxe_io_Bytes(new ArrayBuffer(this.height * this.stride));
+		this.bytes = haxe_io_Bytes.alloc(this.height * this.stride);
 		this.bytes.blit(0,old,this.offset,this.height * this.stride);
 		this.offset = 0;
 		this.flags &= -2;
+	}
+	willChange() {
+		if((this.flags & 1) != 0) {
+			this.copyInner();
+		}
 	}
 	setFlip(b) {
 		if(b == null) {
@@ -17388,9 +15515,7 @@ class hxd_Pixels {
 		if((this.flags & 4) != 0 == b) {
 			return;
 		}
-		if((this.flags & 1) != 0) {
-			this.copyInner();
-		}
+		this.willChange();
 		if(b) {
 			this.flags |= 4;
 		} else {
@@ -17419,14 +15544,12 @@ class hxd_Pixels {
 		}
 	}
 	convert(target) {
-		if(this.innerFormat == target) {
+		if(this.get_format() == target) {
 			return;
 		}
-		if((this.flags & 1) != 0) {
-			this.copyInner();
-		}
+		this.willChange();
 		let bytes = this.bytes.b;
-		let _g = this.innerFormat;
+		let _g = this.get_format();
 		switch(_g._hx_index) {
 		case 0:
 			switch(target._hx_index) {
@@ -17463,7 +15586,7 @@ class hxd_Pixels {
 				}
 				break;
 			default:
-				throw haxe_Exception.thrown("Cannot convert from " + Std.string(this.innerFormat) + " to " + Std.string(target));
+				throw haxe_Exception.thrown("Cannot convert from " + Std.string(this.get_format()) + " to " + Std.string(target));
 			}
 			break;
 		case 1:
@@ -17497,7 +15620,7 @@ class hxd_Pixels {
 				}
 				break;
 			default:
-				throw haxe_Exception.thrown("Cannot convert from " + Std.string(this.innerFormat) + " to " + Std.string(target));
+				throw haxe_Exception.thrown("Cannot convert from " + Std.string(this.get_format()) + " to " + Std.string(target));
 			}
 			break;
 		case 2:
@@ -17531,20 +15654,20 @@ class hxd_Pixels {
 				}
 				break;
 			default:
-				throw haxe_Exception.thrown("Cannot convert from " + Std.string(this.innerFormat) + " to " + Std.string(target));
+				throw haxe_Exception.thrown("Cannot convert from " + Std.string(this.get_format()) + " to " + Std.string(target));
 			}
 			break;
 		case 18:
 			if(target._hx_index == 18) {
 				if(_g.v != target.v) {
-					throw haxe_Exception.thrown("Cannot convert from " + Std.string(this.innerFormat) + " to " + Std.string(target));
+					throw haxe_Exception.thrown("Cannot convert from " + Std.string(this.get_format()) + " to " + Std.string(target));
 				}
 			} else {
-				throw haxe_Exception.thrown("Cannot convert from " + Std.string(this.innerFormat) + " to " + Std.string(target));
+				throw haxe_Exception.thrown("Cannot convert from " + Std.string(this.get_format()) + " to " + Std.string(target));
 			}
 			break;
 		default:
-			throw haxe_Exception.thrown("Cannot convert from " + Std.string(this.innerFormat) + " to " + Std.string(target));
+			throw haxe_Exception.thrown("Cannot convert from " + Std.string(this.get_format()) + " to " + Std.string(target));
 		}
 		this.set_innerFormat(target);
 	}
@@ -17607,7 +15730,7 @@ class hxd_Pixels {
 		return width * tmp;
 	}
 	static alloc(width,height,format) {
-		return new hxd_Pixels(width,height,new haxe_io_Bytes(new ArrayBuffer(height * hxd_Pixels.calcStride(width,format))),format);
+		return new hxd_Pixels(width,height,haxe_io_Bytes.alloc(height * hxd_Pixels.calcStride(width,format)),format);
 	}
 }
 hxd_Pixels.__name__ = "hxd.Pixels";
@@ -18016,19 +16139,18 @@ hxd_SystemValue.__empty_constructs__ = [hxd_SystemValue.IsTouch,hxd_SystemValue.
 class hxd_Timer {
 	static update() {
 		hxd_Timer.frameCount++;
-		let newTime = HxOverrides.now() / 1000;
+		let newTime = haxe_Timer.stamp();
 		hxd_Timer.elapsedTime = newTime - hxd_Timer.lastTimeStamp;
 		hxd_Timer.lastTimeStamp = newTime;
 		if(hxd_Timer.elapsedTime < hxd_Timer.maxDeltaTime) {
-			let a = hxd_Timer.elapsedTime;
-			hxd_Timer.currentDT = a + hxd_Timer.smoothFactor * (hxd_Timer.currentDT - a);
+			hxd_Timer.currentDT = hxd_Math.lerp(hxd_Timer.elapsedTime,hxd_Timer.currentDT,hxd_Timer.smoothFactor);
 		} else {
 			hxd_Timer.elapsedTime = 1 / hxd_Timer.wantedFPS;
 		}
 		hxd_Timer.dt = hxd_Timer.currentDT;
 	}
 	static skip() {
-		hxd_Timer.lastTimeStamp = HxOverrides.now() / 1000;
+		hxd_Timer.lastTimeStamp = haxe_Timer.stamp();
 	}
 }
 hxd_Timer.__name__ = "hxd.Timer";
@@ -18123,23 +16245,21 @@ class hxd_Window {
 		}
 	}
 	event(e) {
-		let _g_head = this.eventTargets.h;
-		while(_g_head != null) {
-			let val = _g_head.item;
-			_g_head = _g_head.next;
-			val(e);
+		let et = this.eventTargets.iterator();
+		while(et.hasNext()) {
+			let et1 = et.next();
+			et1(e);
 		}
 	}
 	addEventTarget(et) {
 		this.eventTargets.add(et);
 	}
 	removeEventTarget(et) {
-		let _g_head = this.eventTargets.h;
-		while(_g_head != null) {
-			let val = _g_head.item;
-			_g_head = _g_head.next;
-			if(Reflect.compareMethods(val,et)) {
-				this.eventTargets.remove(val);
+		let e = this.eventTargets.iterator();
+		while(e.hasNext()) {
+			let e1 = e.next();
+			if(Reflect.compareMethods(e1,et)) {
+				this.eventTargets.remove(e1);
 				break;
 			}
 		}
@@ -18148,22 +16268,20 @@ class hxd_Window {
 		this.resizeEvents.push(f);
 	}
 	removeResizeEvent(f) {
-		let _g_head = this.resizeEvents.h;
-		while(_g_head != null) {
-			let val = _g_head.item;
-			_g_head = _g_head.next;
-			if(Reflect.compareMethods(val,f)) {
+		let e = this.resizeEvents.iterator();
+		while(e.hasNext()) {
+			let e1 = e.next();
+			if(Reflect.compareMethods(e1,f)) {
 				this.resizeEvents.remove(f);
 				break;
 			}
 		}
 	}
 	onResize(e) {
-		let _g_head = this.resizeEvents.h;
-		while(_g_head != null) {
-			let val = _g_head.item;
-			_g_head = _g_head.next;
-			val();
+		let r = this.resizeEvents.iterator();
+		while(r.hasNext()) {
+			let r1 = r.next();
+			r1();
 		}
 	}
 	getPixelRatio() {
@@ -18174,16 +16292,16 @@ class hxd_Window {
 		}
 	}
 	get_width() {
-		return Math.round(this.canvasPos.width * this.getPixelRatio());
+		return hxd_Math.round(this.canvasPos.width * this.getPixelRatio());
 	}
 	get_height() {
-		return Math.round(this.canvasPos.height * this.getPixelRatio());
+		return hxd_Math.round(this.canvasPos.height * this.getPixelRatio());
 	}
 	get_mouseX() {
-		return Math.round((this.curMouseX - this.canvasPos.left) * this.getPixelRatio());
+		return hxd_Math.round((this.curMouseX - this.canvasPos.left) * this.getPixelRatio());
 	}
 	get_mouseY() {
-		return Math.round((this.curMouseY - this.canvasPos.top) * this.getPixelRatio());
+		return hxd_Math.round((this.curMouseY - this.canvasPos.top) * this.getPixelRatio());
 	}
 	onMouseDown(e) {
 		if(e.clientX != this.curMouseX || e.clientY != this.curMouseY) {
@@ -18246,8 +16364,8 @@ class hxd_Window {
 		while(_g < _g1.length) {
 			let touch = _g1[_g];
 			++_g;
-			x = Math.round((touch.clientX - this.canvasPos.left) * this.getPixelRatio());
-			y = Math.round((touch.clientY - this.canvasPos.top) * this.getPixelRatio());
+			x = hxd_Math.round((touch.clientX - this.canvasPos.left) * this.getPixelRatio());
+			y = hxd_Math.round((touch.clientY - this.canvasPos.top) * this.getPixelRatio());
 			ev = new hxd_Event(hxd_EventKind.EPush,x,y);
 			ev.touchId = touch.identifier;
 			this.event(ev);
@@ -18263,8 +16381,8 @@ class hxd_Window {
 		while(_g < _g1.length) {
 			let touch = _g1[_g];
 			++_g;
-			x = Math.round((touch.clientX - this.canvasPos.left) * this.getPixelRatio());
-			y = Math.round((touch.clientY - this.canvasPos.top) * this.getPixelRatio());
+			x = hxd_Math.round((touch.clientX - this.canvasPos.left) * this.getPixelRatio());
+			y = hxd_Math.round((touch.clientY - this.canvasPos.top) * this.getPixelRatio());
 			ev = new hxd_Event(hxd_EventKind.EMove,x,y);
 			ev.touchId = touch.identifier;
 			this.event(ev);
@@ -18280,8 +16398,8 @@ class hxd_Window {
 		while(_g < _g1.length) {
 			let touch = _g1[_g];
 			++_g;
-			x = Math.round((touch.clientX - this.canvasPos.left) * this.getPixelRatio());
-			y = Math.round((touch.clientY - this.canvasPos.top) * this.getPixelRatio());
+			x = hxd_Math.round((touch.clientX - this.canvasPos.left) * this.getPixelRatio());
+			y = hxd_Math.round((touch.clientY - this.canvasPos.top) * this.getPixelRatio());
 			ev = new hxd_Event(hxd_EventKind.ERelease,x,y);
 			ev.touchId = touch.identifier;
 			this.event(ev);
@@ -18401,7 +16519,7 @@ class hxd_System {
 					while(_g1 < _g2.length) {
 						let frame = _g2[_g1];
 						++_g1;
-						_g.alloc.push("url(\"" + frame.ctx.canvas.toDataURL("image/png") + "\") " + _g.offsetX + " " + _g.offsetY + ", default");
+						_g.alloc.push("url(\"" + frame.toNative().canvas.toDataURL("image/png") + "\") " + _g.offsetX + " " + _g.offsetY + ", default");
 					}
 				}
 				if(_g.frames.length > 1) {
@@ -18525,78 +16643,20 @@ class hxd_earcut_Earcut {
 			sum += (points[j].x - points[i].x) * (points[i].y + points[j].y);
 			j = i;
 		}
-		let last = null;
-		let n = this.cache;
-		if(n == null) {
-			n = new hxd_earcut_EarNode();
-			n.allocNext = this.allocated;
-			this.allocated = n;
-		} else {
-			this.cache = n.next;
-		}
-		n.i = -1;
-		n.z = -1;
-		n.x = 0;
-		n.y = 0;
-		n.next = null;
-		n.prev = last;
-		n.steiner = false;
-		n.prevZ = null;
-		n.nextZ = null;
-		let node = n;
+		let node = this.allocNode(-1,0,0,null);
 		let first = node;
 		if(clockwise == sum > 0) {
 			let _g = start;
 			while(_g < end) {
 				let i = _g++;
 				let p = points[i];
-				let n = this.cache;
-				if(n == null) {
-					n = new hxd_earcut_EarNode();
-					n.allocNext = this.allocated;
-					this.allocated = n;
-				} else {
-					this.cache = n.next;
-				}
-				n.i = i;
-				n.z = -1;
-				n.x = p.x;
-				n.y = p.y;
-				n.next = null;
-				n.prev = node;
-				n.steiner = false;
-				n.prevZ = null;
-				n.nextZ = null;
-				if(node != null) {
-					node.next = n;
-				}
-				node = n;
+				node = this.allocNode(i,p.x,p.y,node);
 			}
 		} else {
 			let i = end - 1;
 			while(i >= start) {
 				let p = points[i];
-				let n = this.cache;
-				if(n == null) {
-					n = new hxd_earcut_EarNode();
-					n.allocNext = this.allocated;
-					this.allocated = n;
-				} else {
-					this.cache = n.next;
-				}
-				n.i = i;
-				n.z = -1;
-				n.x = p.x;
-				n.y = p.y;
-				n.next = null;
-				n.prev = node;
-				n.steiner = false;
-				n.prevZ = null;
-				n.nextZ = null;
-				if(node != null) {
-					node.next = n;
-				}
-				node = n;
+				node = this.allocNode(i,p.x,p.y,node);
 				--i;
 			}
 		}
@@ -18613,78 +16673,20 @@ class hxd_earcut_Earcut {
 			sum += (points[j].x - points[i].x) * (points[i].y + points[j].y);
 			j = i;
 		}
-		let last = null;
-		let n = this.cache;
-		if(n == null) {
-			n = new hxd_earcut_EarNode();
-			n.allocNext = this.allocated;
-			this.allocated = n;
-		} else {
-			this.cache = n.next;
-		}
-		n.i = -1;
-		n.z = -1;
-		n.x = 0;
-		n.y = 0;
-		n.next = null;
-		n.prev = last;
-		n.steiner = false;
-		n.prevZ = null;
-		n.nextZ = null;
-		let node = n;
+		let node = this.allocNode(-1,0,0,null);
 		let first = node;
 		if(clockwise == sum > 0) {
 			let _g = start;
 			while(_g < end) {
 				let i = _g++;
 				let p = points[i];
-				let n = this.cache;
-				if(n == null) {
-					n = new hxd_earcut_EarNode();
-					n.allocNext = this.allocated;
-					this.allocated = n;
-				} else {
-					this.cache = n.next;
-				}
-				n.i = i;
-				n.z = -1;
-				n.x = p.x;
-				n.y = p.y;
-				n.next = null;
-				n.prev = node;
-				n.steiner = false;
-				n.prevZ = null;
-				n.nextZ = null;
-				if(node != null) {
-					node.next = n;
-				}
-				node = n;
+				node = this.allocNode(i,p.x,p.y,node);
 			}
 		} else {
 			let i = end - 1;
 			while(i >= start) {
 				let p = points[i];
-				let n = this.cache;
-				if(n == null) {
-					n = new hxd_earcut_EarNode();
-					n.allocNext = this.allocated;
-					this.allocated = n;
-				} else {
-					this.cache = n.next;
-				}
-				n.i = i;
-				n.z = -1;
-				n.x = p.x;
-				n.y = p.y;
-				n.next = null;
-				n.prev = node;
-				n.steiner = false;
-				n.prevZ = null;
-				n.nextZ = null;
-				if(node != null) {
-					node.next = n;
-				}
-				node = n;
+				node = this.allocNode(i,p.x,p.y,node);
 				--i;
 			}
 		}
@@ -18718,9 +16720,7 @@ class hxd_earcut_Earcut {
 				}
 				p = p.next;
 			}
-			let a = maxX - this.minX;
-			let b = maxY - this.minY;
-			this.size = a < b ? b : a;
+			this.size = hxd_Math.max(maxX - this.minX,maxY - this.minY);
 			this.hasSize = true;
 		} else {
 			this.hasSize = false;
@@ -18751,7 +16751,7 @@ class hxd_earcut_Earcut {
 		let p = root;
 		let hx = hole.x;
 		let hy = hole.y;
-		let qx = -Infinity;
+		let qx = hxd_Math.get_NEGATIVE_INFINITY();
 		let m = null;
 		while(true) {
 			if(hy <= p.y && hy >= p.next.y) {
@@ -18770,50 +16770,13 @@ class hxd_earcut_Earcut {
 			return null;
 		}
 		let stop = m;
-		let tanMin = Infinity;
+		let tanMin = hxd_Math.get_POSITIVE_INFINITY();
 		let tan;
 		p = m.next;
 		while(p != stop) {
-			let tmp;
-			if(hx >= p.x && p.x >= m.x) {
-				let ax = hy < m.y ? hx : qx;
-				let bx = m.x;
-				let by = m.y;
-				let cx = hy < m.y ? qx : hx;
-				let px = p.x;
-				let py = p.y;
-				tmp = (cx - px) * (hy - py) - (ax - px) * (hy - py) >= 0 && (ax - px) * (by - py) - (bx - px) * (hy - py) >= 0 && (bx - px) * (hy - py) - (cx - px) * (by - py) >= 0;
-			} else {
-				tmp = false;
-			}
-			if(tmp) {
-				let f = hy - p.y;
-				tan = (f < 0 ? -f : f) / (hx - p.x);
-				let tmp;
-				if(tan < tanMin || tan == tanMin && p.x > m.x) {
-					let p1 = p.prev;
-					let r = p.next;
-					if((p.y - p1.y) * (r.x - p.x) - (p.x - p1.x) * (r.y - p.y) < 0) {
-						let r = p.next;
-						if((hole.y - p.y) * (r.x - hole.x) - (hole.x - p.x) * (r.y - hole.y) >= 0) {
-							let q = p.prev;
-							tmp = (q.y - p.y) * (hole.x - q.x) - (q.x - p.x) * (hole.y - q.y) >= 0;
-						} else {
-							tmp = false;
-						}
-					} else {
-						let r = p.prev;
-						if(!((hole.y - p.y) * (r.x - hole.x) - (hole.x - p.x) * (r.y - hole.y) < 0)) {
-							let q = p.next;
-							tmp = (q.y - p.y) * (hole.x - q.x) - (q.x - p.x) * (hole.y - q.y) < 0;
-						} else {
-							tmp = true;
-						}
-					}
-				} else {
-					tmp = false;
-				}
-				if(tmp) {
+			if(hx >= p.x && p.x >= m.x && this.pointInTriangle(hy < m.y ? hx : qx,hy,m.x,m.y,hy < m.y ? qx : hx,hy,p.x,p.y)) {
+				tan = hxd_Math.abs(hy - p.y) / (hx - p.x);
+				if((tan < tanMin || tan == tanMin && p.x > m.x) && this.locallyInside(p,hole)) {
 					m = p;
 					tanMin = tan;
 				}
@@ -18843,6 +16806,36 @@ class hxd_earcut_Earcut {
 			return -1;
 		}
 	}
+	equals(p1,p2) {
+		if(p1.x == p2.x) {
+			return p1.y == p2.y;
+		} else {
+			return false;
+		}
+	}
+	area(p,q,r) {
+		return (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+	}
+	intersects(p1,q1,p2,q2) {
+		if(this.area(p1,q1,p2) > 0 != this.area(p1,q1,q2) > 0) {
+			return this.area(p2,q2,p1) > 0 != this.area(p2,q2,q1) > 0;
+		} else {
+			return false;
+		}
+	}
+	locallyInside(a,b) {
+		if(this.area(a.prev,a,a.next) < 0) {
+			if(this.area(a,b,a.next) >= 0) {
+				return this.area(a,a.prev,b) >= 0;
+			} else {
+				return false;
+			}
+		} else if(!(this.area(a,b,a.prev) < 0)) {
+			return this.area(a,a.next,b) < 0;
+		} else {
+			return true;
+		}
+	}
 	filterPoints(start,end) {
 		if(start == null) {
 			return start;
@@ -18854,28 +16847,8 @@ class hxd_earcut_Earcut {
 		let again;
 		while(true) {
 			again = false;
-			let tmp;
-			if(!p.steiner) {
-				let p2 = p.next;
-				if(!(p.x == p2.x && p.y == p2.y)) {
-					let p1 = p.prev;
-					let r = p.next;
-					tmp = (p.y - p1.y) * (r.x - p.x) - (p.x - p1.x) * (r.y - p.y) == 0;
-				} else {
-					tmp = true;
-				}
-			} else {
-				tmp = false;
-			}
-			if(tmp) {
-				p.next.prev = p.prev;
-				p.prev.next = p.next;
-				if(p.prevZ != null) {
-					p.prevZ.nextZ = p.nextZ;
-				}
-				if(p.nextZ != null) {
-					p.nextZ.prevZ = p.prevZ;
-				}
+			if(!p.steiner && (this.equals(p,p.next) || this.area(p.prev,p,p.next) == 0)) {
+				this.removeNode(p);
 				end = p.prev;
 				p = end;
 				if(p == p.next) {
@@ -18890,6 +16863,39 @@ class hxd_earcut_Earcut {
 			}
 		}
 		return end;
+	}
+	removeNode(p) {
+		p.next.prev = p.prev;
+		p.prev.next = p.next;
+		if(p.prevZ != null) {
+			p.prevZ.nextZ = p.nextZ;
+		}
+		if(p.nextZ != null) {
+			p.nextZ.prevZ = p.prevZ;
+		}
+	}
+	allocNode(i,x,y,last) {
+		let n = this.cache;
+		if(n == null) {
+			n = new hxd_earcut_EarNode();
+			n.allocNext = this.allocated;
+			this.allocated = n;
+		} else {
+			this.cache = n.next;
+		}
+		n.i = i;
+		n.z = -1;
+		n.x = x;
+		n.y = y;
+		n.next = null;
+		n.prev = last;
+		n.steiner = false;
+		n.prevZ = null;
+		n.nextZ = null;
+		if(last != null) {
+			last.next = n;
+		}
+		return n;
 	}
 	earcutLinked(ear,pass) {
 		if(pass == null) {
@@ -18911,14 +16917,7 @@ class hxd_earcut_Earcut {
 				this.triangles.push(prev.i);
 				this.triangles.push(ear.i);
 				this.triangles.push(next.i);
-				ear.next.prev = ear.prev;
-				ear.prev.next = ear.next;
-				if(ear.prevZ != null) {
-					ear.prevZ.nextZ = ear.nextZ;
-				}
-				if(ear.nextZ != null) {
-					ear.nextZ.prevZ = ear.prevZ;
-				}
+				this.removeNode(ear);
 				ear = next.next;
 				stop = next.next;
 				continue;
@@ -18944,28 +16943,12 @@ class hxd_earcut_Earcut {
 	isEar(ear) {
 		let a = ear.prev;
 		let c = ear.next;
-		if((ear.y - a.y) * (c.x - ear.x) - (ear.x - a.x) * (c.y - ear.y) >= 0) {
+		if(this.area(a,ear,c) >= 0) {
 			return false;
 		}
 		let p = ear.next.next;
 		while(p != ear.prev) {
-			let tmp;
-			let ax = a.x;
-			let ay = a.y;
-			let bx = ear.x;
-			let by = ear.y;
-			let cx = c.x;
-			let cy = c.y;
-			let px = p.x;
-			let py = p.y;
-			if((cx - px) * (ay - py) - (ax - px) * (cy - py) >= 0 && (ax - px) * (by - py) - (bx - px) * (ay - py) >= 0 && (bx - px) * (cy - py) - (cx - px) * (by - py) >= 0) {
-				let p1 = p.prev;
-				let r = p.next;
-				tmp = (p.y - p1.y) * (r.x - p.x) - (p.x - p1.x) * (r.y - p.y) >= 0;
-			} else {
-				tmp = false;
-			}
-			if(tmp) {
+			if(this.pointInTriangle(a.x,a.y,ear.x,ear.y,c.x,c.y,p.x,p.y) && this.area(p.prev,p,p.next) >= 0) {
 				return false;
 			}
 			p = p.next;
@@ -18975,89 +16958,25 @@ class hxd_earcut_Earcut {
 	isEarHashed(ear) {
 		let a = ear.prev;
 		let c = ear.next;
-		if((ear.y - a.y) * (c.x - ear.x) - (ear.x - a.x) * (c.y - ear.y) >= 0) {
+		if(this.area(a,ear,c) >= 0) {
 			return false;
 		}
 		let minTX = a.x < ear.x ? a.x < c.x ? a.x : c.x : ear.x < c.x ? ear.x : c.x;
 		let minTY = a.y < ear.y ? a.y < c.y ? a.y : c.y : ear.y < c.y ? ear.y : c.y;
 		let maxTX = a.x > ear.x ? a.x > c.x ? a.x : c.x : ear.x > c.x ? ear.x : c.x;
 		let maxTY = a.y > ear.y ? a.y > c.y ? a.y : c.y : ear.y > c.y ? ear.y : c.y;
-		let x = 32767 * (minTX - this.minX) / this.size | 0;
-		let y = 32767 * (minTY - this.minY) / this.size | 0;
-		x = (x | x << 8) & 16711935;
-		x = (x | x << 4) & 252645135;
-		x = (x | x << 2) & 858993459;
-		x = (x | x << 1) & 1431655765;
-		y = (y | y << 8) & 16711935;
-		y = (y | y << 4) & 252645135;
-		y = (y | y << 2) & 858993459;
-		y = (y | y << 1) & 1431655765;
-		let minZ = x | y << 1;
-		let x1 = 32767 * (maxTX - this.minX) / this.size | 0;
-		let y1 = 32767 * (maxTY - this.minY) / this.size | 0;
-		x1 = (x1 | x1 << 8) & 16711935;
-		x1 = (x1 | x1 << 4) & 252645135;
-		x1 = (x1 | x1 << 2) & 858993459;
-		x1 = (x1 | x1 << 1) & 1431655765;
-		y1 = (y1 | y1 << 8) & 16711935;
-		y1 = (y1 | y1 << 4) & 252645135;
-		y1 = (y1 | y1 << 2) & 858993459;
-		y1 = (y1 | y1 << 1) & 1431655765;
-		let maxZ = x1 | y1 << 1;
+		let minZ = this.zOrder(minTX,minTY);
+		let maxZ = this.zOrder(maxTX,maxTY);
 		let p = ear.nextZ;
 		while(p != null && p.z <= maxZ) {
-			let tmp;
-			let tmp1;
-			if(p != ear.prev && p != ear.next) {
-				let ax = a.x;
-				let ay = a.y;
-				let bx = ear.x;
-				let by = ear.y;
-				let cx = c.x;
-				let cy = c.y;
-				let px = p.x;
-				let py = p.y;
-				tmp1 = (cx - px) * (ay - py) - (ax - px) * (cy - py) >= 0 && (ax - px) * (by - py) - (bx - px) * (ay - py) >= 0 && (bx - px) * (cy - py) - (cx - px) * (by - py) >= 0;
-			} else {
-				tmp1 = false;
-			}
-			if(tmp1) {
-				let p1 = p.prev;
-				let r = p.next;
-				tmp = (p.y - p1.y) * (r.x - p.x) - (p.x - p1.x) * (r.y - p.y) >= 0;
-			} else {
-				tmp = false;
-			}
-			if(tmp) {
+			if(p != ear.prev && p != ear.next && this.pointInTriangle(a.x,a.y,ear.x,ear.y,c.x,c.y,p.x,p.y) && this.area(p.prev,p,p.next) >= 0) {
 				return false;
 			}
 			p = p.nextZ;
 		}
 		p = ear.prevZ;
 		while(p != null && p.z >= minZ) {
-			let tmp;
-			let tmp1;
-			if(p != ear.prev && p != ear.next) {
-				let ax = a.x;
-				let ay = a.y;
-				let bx = ear.x;
-				let by = ear.y;
-				let cx = c.x;
-				let cy = c.y;
-				let px = p.x;
-				let py = p.y;
-				tmp1 = (cx - px) * (ay - py) - (ax - px) * (cy - py) >= 0 && (ax - px) * (by - py) - (bx - px) * (ay - py) >= 0 && (bx - px) * (cy - py) - (cx - px) * (by - py) >= 0;
-			} else {
-				tmp1 = false;
-			}
-			if(tmp1) {
-				let p1 = p.prev;
-				let r = p.next;
-				tmp = (p.y - p1.y) * (r.x - p.x) - (p.x - p1.x) * (r.y - p.y) >= 0;
-			} else {
-				tmp = false;
-			}
-			if(tmp) {
+			if(p != ear.prev && p != ear.next && this.pointInTriangle(a.x,a.y,ear.x,ear.y,c.x,c.y,p.x,p.y) && this.area(p.prev,p,p.next) >= 0) {
 				return false;
 			}
 			p = p.prevZ;
@@ -19069,76 +16988,12 @@ class hxd_earcut_Earcut {
 		while(true) {
 			let a = p.prev;
 			let b = p.next.next;
-			let tmp;
-			let tmp1;
-			let p2 = p.next;
-			if((p.y - a.y) * (p2.x - p.x) - (p.x - a.x) * (p2.y - p.y) > 0 != (p.y - a.y) * (b.x - p.x) - (p.x - a.x) * (b.y - p.y) > 0 && (b.y - p2.y) * (a.x - b.x) - (b.x - p2.x) * (a.y - b.y) > 0 != (b.y - p2.y) * (p.x - b.x) - (b.x - p2.x) * (p.y - b.y) > 0) {
-				let p = a.prev;
-				let r = a.next;
-				if((a.y - p.y) * (r.x - a.x) - (a.x - p.x) * (r.y - a.y) < 0) {
-					let r = a.next;
-					if((b.y - a.y) * (r.x - b.x) - (b.x - a.x) * (r.y - b.y) >= 0) {
-						let q = a.prev;
-						tmp1 = (q.y - a.y) * (b.x - q.x) - (q.x - a.x) * (b.y - q.y) >= 0;
-					} else {
-						tmp1 = false;
-					}
-				} else {
-					let r = a.prev;
-					if(!((b.y - a.y) * (r.x - b.x) - (b.x - a.x) * (r.y - b.y) < 0)) {
-						let q = a.next;
-						tmp1 = (q.y - a.y) * (b.x - q.x) - (q.x - a.x) * (b.y - q.y) < 0;
-					} else {
-						tmp1 = true;
-					}
-				}
-			} else {
-				tmp1 = false;
-			}
-			if(tmp1) {
-				let p = b.prev;
-				let r = b.next;
-				if((b.y - p.y) * (r.x - b.x) - (b.x - p.x) * (r.y - b.y) < 0) {
-					let r = b.next;
-					if((a.y - b.y) * (r.x - a.x) - (a.x - b.x) * (r.y - a.y) >= 0) {
-						let q = b.prev;
-						tmp = (q.y - b.y) * (a.x - q.x) - (q.x - b.x) * (a.y - q.y) >= 0;
-					} else {
-						tmp = false;
-					}
-				} else {
-					let r = b.prev;
-					if(!((a.y - b.y) * (r.x - a.x) - (a.x - b.x) * (r.y - a.y) < 0)) {
-						let q = b.next;
-						tmp = (q.y - b.y) * (a.x - q.x) - (q.x - b.x) * (a.y - q.y) < 0;
-					} else {
-						tmp = true;
-					}
-				}
-			} else {
-				tmp = false;
-			}
-			if(tmp) {
+			if(this.intersects(a,p,p.next,b) && this.locallyInside(a,b) && this.locallyInside(b,a)) {
 				this.triangles.push(a.i);
 				this.triangles.push(p.i);
 				this.triangles.push(b.i);
-				p.next.prev = p.prev;
-				p.prev.next = p.next;
-				if(p.prevZ != null) {
-					p.prevZ.nextZ = p.nextZ;
-				}
-				if(p.nextZ != null) {
-					p.nextZ.prevZ = p.prevZ;
-				}
-				let p1 = p.next;
-				p1.next.prev = p1.prev;
-				p1.prev.next = p1.next;
-				if(p1.prevZ != null) {
-					p1.prevZ.nextZ = p1.nextZ;
-				}
-				if(p1.nextZ != null) {
-					p1.nextZ.prevZ = p1.prevZ;
-				}
+				this.removeNode(p);
+				this.removeNode(p.next);
 				start = b;
 				p = b;
 			}
@@ -19171,44 +17026,8 @@ class hxd_earcut_Earcut {
 		}
 	}
 	splitPolygon(a,b) {
-		let last = null;
-		let n = this.cache;
-		if(n == null) {
-			n = new hxd_earcut_EarNode();
-			n.allocNext = this.allocated;
-			this.allocated = n;
-		} else {
-			this.cache = n.next;
-		}
-		n.i = a.i;
-		n.z = -1;
-		n.x = a.x;
-		n.y = a.y;
-		n.next = null;
-		n.prev = last;
-		n.steiner = false;
-		n.prevZ = null;
-		n.nextZ = null;
-		let a2 = n;
-		let last1 = null;
-		let n1 = this.cache;
-		if(n1 == null) {
-			n1 = new hxd_earcut_EarNode();
-			n1.allocNext = this.allocated;
-			this.allocated = n1;
-		} else {
-			this.cache = n1.next;
-		}
-		n1.i = b.i;
-		n1.z = -1;
-		n1.x = b.x;
-		n1.y = b.y;
-		n1.next = null;
-		n1.prev = last1;
-		n1.steiner = false;
-		n1.prevZ = null;
-		n1.nextZ = null;
-		let b2 = n1;
+		let a2 = this.allocNode(a.i,a.x,a.y);
+		let b2 = this.allocNode(b.i,b.x,b.y);
 		let an = a.next;
 		let bp = b.prev;
 		a.next = b;
@@ -19221,57 +17040,16 @@ class hxd_earcut_Earcut {
 		b2.prev = bp;
 		return b2;
 	}
+	pointInTriangle(ax,ay,bx,by,cx,cy,px,py) {
+		if((cx - px) * (ay - py) - (ax - px) * (cy - py) >= 0 && (ax - px) * (by - py) - (bx - px) * (ay - py) >= 0) {
+			return (bx - px) * (cy - py) - (cx - px) * (by - py) >= 0;
+		} else {
+			return false;
+		}
+	}
 	isValidDiagonal(a,b) {
-		if(!(a.x == b.x && a.y == b.y)) {
-			let tmp;
-			let tmp1;
-			if(a.next.i != b.i && a.prev.i != b.i && !this.intersectsPolygon(a,b)) {
-				let p = a.prev;
-				let r = a.next;
-				if((a.y - p.y) * (r.x - a.x) - (a.x - p.x) * (r.y - a.y) < 0) {
-					let r = a.next;
-					if((b.y - a.y) * (r.x - b.x) - (b.x - a.x) * (r.y - b.y) >= 0) {
-						let q = a.prev;
-						tmp1 = (q.y - a.y) * (b.x - q.x) - (q.x - a.x) * (b.y - q.y) >= 0;
-					} else {
-						tmp1 = false;
-					}
-				} else {
-					let r = a.prev;
-					if(!((b.y - a.y) * (r.x - b.x) - (b.x - a.x) * (r.y - b.y) < 0)) {
-						let q = a.next;
-						tmp1 = (q.y - a.y) * (b.x - q.x) - (q.x - a.x) * (b.y - q.y) < 0;
-					} else {
-						tmp1 = true;
-					}
-				}
-			} else {
-				tmp1 = false;
-			}
-			if(tmp1) {
-				let p = b.prev;
-				let r = b.next;
-				if((b.y - p.y) * (r.x - b.x) - (b.x - p.x) * (r.y - b.y) < 0) {
-					let r = b.next;
-					if((a.y - b.y) * (r.x - a.x) - (a.x - b.x) * (r.y - a.y) >= 0) {
-						let q = b.prev;
-						tmp = (q.y - b.y) * (a.x - q.x) - (q.x - b.x) * (a.y - q.y) >= 0;
-					} else {
-						tmp = false;
-					}
-				} else {
-					let r = b.prev;
-					if(!((a.y - b.y) * (r.x - a.x) - (a.x - b.x) * (r.y - a.y) < 0)) {
-						let q = b.next;
-						tmp = (q.y - b.y) * (a.x - q.x) - (q.x - b.x) * (a.y - q.y) < 0;
-					} else {
-						tmp = true;
-					}
-				}
-			} else {
-				tmp = false;
-			}
-			if(tmp) {
+		if(!this.equals(a,b)) {
+			if(a.next.i != b.i && a.prev.i != b.i && !this.intersectsPolygon(a,b) && this.locallyInside(a,b) && this.locallyInside(b,a)) {
 				return this.middleInside(a,b);
 			} else {
 				return false;
@@ -19299,14 +17077,7 @@ class hxd_earcut_Earcut {
 	intersectsPolygon(a,b) {
 		let p = a;
 		while(true) {
-			let tmp;
-			if(p.i != a.i && p.next.i != a.i && p.i != b.i && p.next.i != b.i) {
-				let q1 = p.next;
-				tmp = (q1.y - p.y) * (a.x - q1.x) - (q1.x - p.x) * (a.y - q1.y) > 0 != (q1.y - p.y) * (b.x - q1.x) - (q1.x - p.x) * (b.y - q1.y) > 0 && (b.y - a.y) * (p.x - b.x) - (b.x - a.x) * (p.y - b.y) > 0 != (b.y - a.y) * (q1.x - b.x) - (b.x - a.x) * (q1.y - b.y) > 0;
-			} else {
-				tmp = false;
-			}
-			if(tmp) {
+			if(p.i != a.i && p.next.i != a.i && p.i != b.i && p.next.i != b.i && this.intersects(p,p.next,a,b)) {
 				return true;
 			}
 			p = p.next;
@@ -19316,21 +17087,24 @@ class hxd_earcut_Earcut {
 		}
 		return false;
 	}
+	zOrder(px,py) {
+		let x = Std.int(32767 * (px - this.minX) / this.size);
+		let y = Std.int(32767 * (py - this.minY) / this.size);
+		x = (x | x << 8) & 16711935;
+		x = (x | x << 4) & 252645135;
+		x = (x | x << 2) & 858993459;
+		x = (x | x << 1) & 1431655765;
+		y = (y | y << 8) & 16711935;
+		y = (y | y << 4) & 252645135;
+		y = (y | y << 2) & 858993459;
+		y = (y | y << 1) & 1431655765;
+		return x | y << 1;
+	}
 	indexCurve(start) {
 		let p = start;
 		while(true) {
 			if(p.z < 0) {
-				let x = 32767 * (p.x - this.minX) / this.size | 0;
-				let y = 32767 * (p.y - this.minY) / this.size | 0;
-				x = (x | x << 8) & 16711935;
-				x = (x | x << 4) & 252645135;
-				x = (x | x << 2) & 858993459;
-				x = (x | x << 1) & 1431655765;
-				y = (y | y << 8) & 16711935;
-				y = (y | y << 4) & 252645135;
-				y = (y | y << 2) & 858993459;
-				y = (y | y << 1) & 1431655765;
-				p.z = x | y << 1;
+				p.z = this.zOrder(p.x,p.y);
 			}
 			p.prevZ = p.prev;
 			p.nextZ = p.next;
@@ -19441,6 +17215,12 @@ hxd_impl_Allocator.__name__ = "hxd.impl.Allocator";
 Object.assign(hxd_impl_Allocator.prototype, {
 	__class__: hxd_impl_Allocator
 });
+class hxd_impl_Api {
+	static downcast(value,c) {
+		return Std.downcast(value,c);
+	}
+}
+hxd_impl_Api.__name__ = "hxd.impl.Api";
 class hxd_res_Embed {
 }
 hxd_res_Embed.__name__ = "hxd.res.Embed";
@@ -19793,7 +17573,7 @@ class hxsl_Tools {
 			}
 			return tmp2 + tmp3 + "]";
 		default:
-			return HxOverrides.substr($hxEnums[t.__enum__].__constructs__[t._hx_index],1,null);
+			return HxOverrides.substr(Type.enumConstructor(t),1,null);
 		}
 	}
 	static hasSideEffect(e) {
@@ -20207,7 +17987,7 @@ class hxsl_Tools {
 hxsl_Tools.__name__ = "hxsl.Tools";
 class hxsl_Tools2 {
 	static toString(g) {
-		let n = $hxEnums[g.__enum__].__constructs__[g._hx_index];
+		let n = Type.enumConstructor(g);
 		return n.charAt(0).toLowerCase() + HxOverrides.substr(n,1,null);
 	}
 }
@@ -20276,7 +18056,7 @@ class hxsl_Cache {
 			_g.push(Std.string(v));
 		}
 		let key = _g.join(",");
-		let shader = this.linkShaders.h[key];
+		let shader = this.linkShaders.get(key);
 		if(shader != null) {
 			return shader;
 		}
@@ -20284,7 +18064,7 @@ class hxsl_Cache {
 		let id = HxOverrides.substr(haxe_crypto_Md5.encode(key),0,8);
 		s.data = { name : "shaderLinker_" + id, vars : [], funs : []};
 		let pos = null;
-		let outVars_h = Object.create(null);
+		let outVars = new haxe_ds_StringMap();
 		let outputCount = 0;
 		let tvec4 = hxsl_Type.TVec(4,hxsl_VecType.VFloat);
 		let makeVec = function(g,size,args,makeOutExpr) {
@@ -20302,7 +18082,7 @@ class hxsl_Cache {
 		};
 		let makeVar = function(name,t,parent) {
 			let path = parent == null ? name : hxsl_Tools.getName(parent) + "." + name;
-			let v = outVars_h[path];
+			let v = outVars.get(path);
 			if(v != null) {
 				return v;
 			}
@@ -20317,7 +18097,7 @@ class hxsl_Cache {
 					throw haxe_Exception.thrown("assert");
 				}
 			}
-			outVars_h[path] = v;
+			outVars.set(path,v);
 			return v;
 		};
 		let makeOutExpr = null;
@@ -20328,7 +18108,7 @@ class hxsl_Cache {
 			case 1:
 				let _g = v.size;
 				let _g1 = v.v;
-				let v1 = outVars_h[_g1];
+				let v1 = outVars.get(_g1);
 				if(v1 != null) {
 					return { e : hxsl_TExprDef.TVar(v1), t : v1.type, p : pos};
 				}
@@ -20375,27 +18155,25 @@ class hxsl_Cache {
 		};
 		defineFun(hxsl_FunctionKind.Vertex,[hxsl_Output.Value("output.position")]);
 		defineFun(hxsl_FunctionKind.Fragment,vars);
-		shader = Object.create(hxsl_Shader.prototype);
+		shader = Type.createEmptyInstance(hxsl_Shader);
 		shader.shader = s;
-		this.linkShaders.h[key] = shader;
+		this.linkShaders.set(key,shader);
 		shader.updateConstantsFinal(null);
 		return shader;
 	}
 	link(shaders,batchMode) {
 		let c = this.linkCache;
-		let last = null;
-		let _g_l = shaders;
-		while(_g_l != last) {
-			let s = _g_l.s;
-			_g_l = _g_l.next;
-			let i = s.instance;
+		let s = shaders.iterator();
+		while(s.hasNext()) {
+			let s1 = s.next();
+			let i = s1.instance;
 			if(c.next == null) {
 				c.next = new haxe_ds_IntMap();
 			}
-			let cs = c.next.h[i.id];
+			let cs = c.next.get(i.id);
 			if(cs == null) {
 				cs = new hxsl_SearchMap();
-				c.next.h[i.id] = cs;
+				c.next.set(i.id,cs);
 			}
 			c = cs;
 		}
@@ -20407,13 +18185,11 @@ class hxsl_Cache {
 	compileRuntimeShader(shaders,batchMode) {
 		let shaderDatas = [];
 		let index = 0;
-		let last = null;
-		let _g_l = shaders;
-		while(_g_l != last) {
-			let s = _g_l.s;
-			_g_l = _g_l.next;
-			let i = s.instance;
-			shaderDatas.push({ inst : i, p : s.priority, index : index++});
+		let s = shaders.iterator();
+		while(s.hasNext()) {
+			let s1 = s.next();
+			let i = s1.instance;
+			shaderDatas.push({ inst : i, p : s1.priority, index : index++});
 		}
 		shaderDatas.reverse();
 		haxe_ds_ArraySort.sort(shaderDatas,function(s1,s2) {
@@ -20426,7 +18202,7 @@ class hxsl_Cache {
 			hxsl_Printer.check(s.inst.shader);
 		}
 		let linker = new hxsl_Linker(batchMode);
-		let s;
+		let s1;
 		try {
 			let _g = [];
 			let _g1 = 0;
@@ -20435,10 +18211,10 @@ class hxsl_Cache {
 				++_g1;
 				_g.push(s.inst.shader);
 			}
-			s = linker.link(_g);
+			s1 = linker.link(_g);
 		} catch( _g ) {
 			let _g1 = haxe_Exception.caught(_g).unwrap();
-			if(((_g1) instanceof hxsl_Error)) {
+			if(Std.isOfType(_g1,hxsl_Error)) {
 				let e = _g1;
 				let _g = [];
 				let _g2 = 0;
@@ -20460,7 +18236,7 @@ class hxsl_Cache {
 			++_g2;
 			_g1.push(s.inst.shader);
 		}
-		hxsl_Printer.check(s,_g1);
+		hxsl_Printer.check(s1,_g1);
 		let paramVars = new haxe_ds_IntMap();
 		let _g3 = 0;
 		let _g4 = linker.allVars;
@@ -20472,18 +18248,18 @@ class hxsl_Cache {
 					continue;
 				}
 				let inf = shaderDatas[v.instanceIndex];
-				paramVars.h[v.id] = { instance : inf.index, index : inf.inst.params.h[v.merged[0].id]};
+				paramVars.set(v.id,{ instance : inf.index, index : inf.inst.params.get(v.merged[0].id)});
 			}
 		}
-		let prev = s;
-		let s1;
+		let prev = s1;
+		let s2;
 		try {
-			s1 = new hxsl_Splitter().split(s);
+			s2 = new hxsl_Splitter().split(s1);
 		} catch( _g ) {
 			let _g1 = haxe_Exception.caught(_g).unwrap();
-			if(((_g1) instanceof hxsl_Error)) {
+			if(Std.isOfType(_g1,hxsl_Error)) {
 				let e = _g1;
-				e.msg += "\n\nin\n\n" + hxsl_Printer.shaderToString(s);
+				e.msg += "\n\nin\n\n" + hxsl_Printer.shaderToString(s1);
 				throw haxe_Exception.thrown(e);
 			} else {
 				throw _g;
@@ -20491,7 +18267,7 @@ class hxsl_Cache {
 		}
 		if(batchMode) {
 			let _g = 0;
-			let _g1 = s1.vertex.vars;
+			let _g1 = s2.vertex.vars;
 			while(_g < _g1.length) {
 				let v = _g1[_g];
 				++_g;
@@ -20500,19 +18276,17 @@ class hxsl_Cache {
 				}
 			}
 		}
-		hxsl_Printer.check(s1.vertex,[prev]);
-		hxsl_Printer.check(s1.fragment,[prev]);
-		let prev1 = s1;
-		let s2 = new hxsl_Dce().dce(s1.vertex,s1.fragment);
-		hxsl_Printer.check(s2.vertex,[prev1.vertex]);
-		hxsl_Printer.check(s2.fragment,[prev1.fragment]);
-		let r = this.buildRuntimeShader(s2.vertex,s2.fragment,paramVars);
+		hxsl_Printer.check(s2.vertex,[prev]);
+		hxsl_Printer.check(s2.fragment,[prev]);
+		let prev1 = s2;
+		let s3 = new hxsl_Dce().dce(s2.vertex,s2.fragment);
+		hxsl_Printer.check(s3.vertex,[prev1.vertex]);
+		hxsl_Printer.check(s3.fragment,[prev1.fragment]);
+		let r = this.buildRuntimeShader(s3.vertex,s3.fragment,paramVars);
 		let _g5 = [];
-		let last1 = null;
-		let _g7_l = shaders;
-		while(_g7_l != last1) {
-			let s = _g7_l.s;
-			_g7_l = _g7_l.next;
+		let s4 = shaders.iterator();
+		while(s4.hasNext()) {
+			let s = s4.next();
 			_g5.push(new hxsl_ShaderInstanceDesc(s.shader,s.constBits));
 		}
 		r.spec = { instances : _g5, signature : null};
@@ -20535,11 +18309,11 @@ class hxsl_Cache {
 		r.spec.signature = haxe_crypto_Md5.encode(tmp);
 		r.signature = haxe_crypto_Md5.encode(hxsl_Printer.shaderToString(r.vertex.data) + hxsl_Printer.shaderToString(r.fragment.data));
 		r.batchMode = batchMode;
-		let r2 = this.byID.h[r.signature];
+		let r2 = this.byID.get(r.signature);
 		if(r2 != null) {
 			r.id = r2.id;
 		} else {
-			this.byID.h[r.signature] = r;
+			this.byID.set(r.signature,r);
 		}
 		return r;
 	}
@@ -20558,13 +18332,13 @@ class hxsl_Cache {
 	initGlobals(r,s) {
 		let p = s.globals;
 		while(p != null) {
-			r.globals.h[p.gid] = true;
+			r.globals.set(p.gid,true);
 			p = p.next;
 		}
 		let p1 = s.params;
 		while(p1 != null) {
 			if(p1.perObjectGlobal != null) {
-				r.globals.h[p1.perObjectGlobal.gid] = true;
+				r.globals.set(p1.perObjectGlobal.gid,true);
 			}
 			p1 = p1.next;
 		}
@@ -20585,7 +18359,7 @@ class hxsl_Cache {
 		let g = flat.allocData.keys();
 		while(g.hasNext()) {
 			let g1 = g.next();
-			let alloc = flat.allocData.h[g1.__id__];
+			let alloc = flat.allocData.get(g1);
 			switch(g1.kind._hx_index) {
 			case 0:
 				let _g = [];
@@ -20638,7 +18412,7 @@ class hxsl_Cache {
 					if(a.v == null) {
 						continue;
 					}
-					let p = params.h[a.v.id];
+					let p = params.get(a.v.id);
 					if(p == null) {
 						let ap = new hxsl_AllocParam(a.v.name,a.pos,-1,-1,a.v.type);
 						ap.perObjectGlobal = new hxsl_AllocGlobal(-1,this.getPath(a.v),a.v.type);
@@ -20696,7 +18470,7 @@ class hxsl_Cache {
 		}
 		if(textures.length > 0) {
 			textures.sort(function(t1,t2) {
-				return t1.t._hx_index - t2.t._hx_index;
+				return Type.enumIndex(t1.t) - Type.enumIndex(t2.t);
 			});
 			c.textures = textures[0].all[0];
 			let _g = 1;
@@ -20748,12 +18522,12 @@ class hxsl_Clone {
 		this.varMap = new haxe_ds_IntMap();
 	}
 	tvar(v) {
-		let v2 = this.varMap.h[v.id];
+		let v2 = this.varMap.get(v.id);
 		if(v2 != null) {
 			return v2;
 		}
 		v2 = { id : hxsl_Tools.allocVarId(), type : v.type, name : v.name, kind : v.kind};
-		this.varMap.h[v.id] = v2;
+		this.varMap.set(v.id,v2);
 		if(v.parent != null) {
 			v2.parent = this.tvar(v.parent);
 		}
@@ -20871,6 +18645,8 @@ Object.assign(hxsl__$Dce_VarDeps.prototype, {
 class hxsl_Dce {
 	constructor() {
 	}
+	debug(msg,pos) {
+	}
 	dce(vertex,fragment) {
 		this.used = new haxe_ds_IntMap();
 		this.channelVars = [];
@@ -20914,6 +18690,7 @@ class hxsl_Dce {
 		}
 		let outExprs = [];
 		while(true) {
+			this.debug("DCE LOOP",{ fileName : "hxsl/Dce.hx", lineNumber : 65, className : "hxsl.Dce", methodName : "dce"});
 			let v = this.used.iterator();
 			while(v.hasNext()) {
 				let v1 = v.next();
@@ -20983,10 +18760,10 @@ class hxsl_Dce {
 		return { fragment : fragment, vertex : vertex};
 	}
 	get(v) {
-		let vd = this.used.h[v.id];
+		let vd = this.used.get(v.id);
 		if(vd == null) {
 			vd = new hxsl__$Dce_VarDeps(v);
-			this.used.h[v.id] = vd;
+			this.used.set(v.id,vd);
 		}
 		return vd;
 	}
@@ -20994,6 +18771,7 @@ class hxsl_Dce {
 		if(v.used) {
 			return;
 		}
+		this.debug(v.v.name + " is used",{ fileName : "hxsl/Dce.hx", lineNumber : 118, className : "hxsl.Dce", methodName : "markRec"});
 		v.used = true;
 		let d = v.deps.iterator();
 		while(d.hasNext()) {
@@ -21009,12 +18787,14 @@ class hxsl_Dce {
 			++_g;
 			if(w == null) {
 				if(!vd.keep) {
+					this.debug("Force keep " + vd.v.name,{ fileName : "hxsl/Dce.hx", lineNumber : 130, className : "hxsl.Dce", methodName : "link"});
 					vd.keep = true;
 					this.markAsKeep = true;
 				}
 				continue;
 			}
-			w.deps.h[v.id] = vd;
+			this.debug(w.v.name + " depends on " + vd.v.name,{ fileName : "hxsl/Dce.hx", lineNumber : 136, className : "hxsl.Dce", methodName : "link"});
+			w.deps.set(v.id,vd);
 		}
 	}
 	check(e,writeTo,isAffected) {
@@ -21576,10 +19356,10 @@ class hxsl_Eval {
 		this.constants = new haxe_ds_IntMap();
 	}
 	setConstant(v,c) {
-		this.constants.h[v.id] = hxsl_TExprDef.TConst(c);
+		this.constants.set(v.id,hxsl_TExprDef.TConst(c));
 	}
 	mapVar(v) {
-		let v2 = this.varMap.h[v.__id__];
+		let v2 = this.varMap.get(v);
 		if(v2 != null) {
 			if(v == v2) {
 				return v2;
@@ -21589,7 +19369,7 @@ class hxsl_Eval {
 		}
 		if(v.parent != null) {
 			this.mapVar(v.parent);
-			v2 = this.varMap.h[v.__id__];
+			v2 = this.varMap.get(v);
 			if(v2 != null) {
 				if(v == v2) {
 					return v2;
@@ -21625,7 +19405,7 @@ class hxsl_Eval {
 			let _g5 = _g.t;
 			if(_g4._hx_index == 1) {
 				let _g = _g4.v;
-				let c = this.constants.h[_g.id];
+				let c = this.constants.get(_g.id);
 				if(c != null) {
 					if(c == null) {
 						hxsl_Error.t("Integer value expected for array size constant " + _g.name,null);
@@ -21651,7 +19431,7 @@ class hxsl_Eval {
 			let _g7 = _g.t;
 			if(_g6._hx_index == 1) {
 				let _g = _g6.v;
-				let c = this.constants.h[_g.id];
+				let c = this.constants.get(_g.id);
 				if(c != null) {
 					if(c == null) {
 						hxsl_Error.t("Integer value expected for array size constant " + _g.name,null);
@@ -21941,7 +19721,7 @@ class hxsl_Eval {
 		let c = this.constants.keys();
 		while(c.hasNext()) {
 			let c1 = c.next();
-			_g.push(c1 + " => " + hxsl_Printer.toString({ e : this.constants.h[c1], t : hxsl_Type.TVoid, p : null},true));
+			_g.push(c1 + " => " + hxsl_Printer.toString({ e : this.constants.get(c1), t : hxsl_Type.TVoid, p : null},true));
 		}
 		return _g.toString();
 	}
@@ -21958,7 +19738,7 @@ class hxsl_Eval {
 			break;
 		case 1:
 			let _g1 = _g.v;
-			let c = this.constants.h[_g1.id];
+			let c = this.constants.get(_g1.id);
 			if(c != null) {
 				d = c;
 			} else {
@@ -22014,7 +19794,7 @@ class hxsl_Eval {
 					case 2:
 						if(_g6._hx_index == 0) {
 							let _g1 = _g6.c;
-							d = _g1._hx_index == 2 ? hxsl_TExprDef.TConst(hxsl_Const.CInt(_g.v + _g1.v | 0)) : hxsl_TExprDef.TBinop(_g5,e11,e2);
+							d = _g1._hx_index == 2 ? hxsl_TExprDef.TConst(hxsl_Const.CInt(Std.int(_g.v + _g1.v))) : hxsl_TExprDef.TBinop(_g5,e11,e2);
 						} else {
 							d = hxsl_TExprDef.TBinop(_g5,e11,e2);
 						}
@@ -22043,7 +19823,7 @@ class hxsl_Eval {
 					case 2:
 						if(_g8._hx_index == 0) {
 							let _g1 = _g8.c;
-							d = _g1._hx_index == 2 ? hxsl_TExprDef.TConst(hxsl_Const.CInt(_g.v * _g1.v | 0)) : hxsl_TExprDef.TBinop(_g5,e11,e2);
+							d = _g1._hx_index == 2 ? hxsl_TExprDef.TConst(hxsl_Const.CInt(Std.int(_g.v * _g1.v))) : hxsl_TExprDef.TBinop(_g5,e11,e2);
 						} else {
 							d = hxsl_TExprDef.TBinop(_g5,e11,e2);
 						}
@@ -22072,7 +19852,7 @@ class hxsl_Eval {
 					case 2:
 						if(_g10._hx_index == 0) {
 							let _g1 = _g10.c;
-							d = _g1._hx_index == 2 ? hxsl_TExprDef.TConst(hxsl_Const.CInt(_g.v / _g1.v | 0)) : hxsl_TExprDef.TBinop(_g5,e11,e2);
+							d = _g1._hx_index == 2 ? hxsl_TExprDef.TConst(hxsl_Const.CInt(Std.int(_g.v / _g1.v))) : hxsl_TExprDef.TBinop(_g5,e11,e2);
 						} else {
 							d = hxsl_TExprDef.TBinop(_g5,e11,e2);
 						}
@@ -22101,7 +19881,7 @@ class hxsl_Eval {
 					case 2:
 						if(_g12._hx_index == 0) {
 							let _g1 = _g12.c;
-							d = _g1._hx_index == 2 ? hxsl_TExprDef.TConst(hxsl_Const.CInt(_g.v - _g1.v | 0)) : hxsl_TExprDef.TBinop(_g5,e11,e2);
+							d = _g1._hx_index == 2 ? hxsl_TExprDef.TConst(hxsl_Const.CInt(Std.int(_g.v - _g1.v))) : hxsl_TExprDef.TBinop(_g5,e11,e2);
 						} else {
 							d = hxsl_TExprDef.TBinop(_g5,e11,e2);
 						}
@@ -22847,7 +20627,7 @@ class hxsl_Eval {
 					case 2:
 						if(_g42._hx_index == 0) {
 							let _g1 = _g42.c;
-							d = _g1._hx_index == 2 ? hxsl_TExprDef.TConst(hxsl_Const.CInt(_g.v % _g1.v | 0)) : hxsl_TExprDef.TBinop(_g5,e11,e2);
+							d = _g1._hx_index == 2 ? hxsl_TExprDef.TConst(hxsl_Const.CInt(Std.int(_g.v % _g1.v))) : hxsl_TExprDef.TBinop(_g5,e11,e2);
 						} else {
 							d = hxsl_TExprDef.TBinop(_g5,e11,e2);
 						}
@@ -22925,8 +20705,8 @@ class hxsl_Eval {
 				let _g51 = _g50.v;
 				if(!this.inlineCalls) {
 					d = hxsl_TExprDef.TCall(c1,_g48);
-				} else if(this.funMap.h.__keys__[_g51.__id__] != null) {
-					let f = this.funMap.h[_g51.__id__];
+				} else if(this.funMap.exists(_g51)) {
+					let f = this.funMap.get(_g51);
 					let outExprs = [];
 					let undo = [];
 					let _g = 0;
@@ -22938,31 +20718,31 @@ class hxsl_Eval {
 						let _g1 = e.e;
 						switch(_g1._hx_index) {
 						case 0:
-							let old = this.constants.h[v.id];
+							let old = this.constants.get(v.id);
 							undo.push(function() {
 								if(old == null) {
 									_gthis.constants.remove(v.id);
 								} else {
-									_gthis.constants.h[v.id] = old;
+									_gthis.constants.set(v.id,old);
 								}
 							});
-							this.constants.h[v.id] = e.e;
+							this.constants.set(v.id,e.e);
 							break;
 						case 1:
 							switch(_g1.v.kind._hx_index) {
 							case 0:case 1:case 2:
-								let old1 = this.constants.h[v.id];
+								let old1 = this.constants.get(v.id);
 								undo.push(function() {
 									if(old1 == null) {
 										_gthis.constants.remove(v.id);
 									} else {
-										_gthis.constants.h[v.id] = old1;
+										_gthis.constants.set(v.id,old1);
 									}
 								});
-								this.constants.h[v.id] = e.e;
+								this.constants.set(v.id,e.e);
 								break;
 							default:
-								let old2 = this.varMap.h[v.__id__];
+								let old2 = this.varMap.get(v);
 								if(old2 == null) {
 									undo.push(function() {
 										_gthis.varMap.remove(v);
@@ -22978,7 +20758,7 @@ class hxsl_Eval {
 							}
 							break;
 						default:
-							let old3 = this.varMap.h[v.__id__];
+							let old3 = this.varMap.get(v);
 							if(old3 == null) {
 								undo.push(function() {
 									_gthis.varMap.remove(v);
@@ -23096,7 +20876,7 @@ class hxsl_Eval {
 										let _g2 = _g1.v;
 										while(_g2 < _g) {
 											let i = _g2++;
-											this.constants.h[_g57.id] = hxsl_TExprDef.TConst(hxsl_Const.CInt(i));
+											this.constants.set(_g57.id,hxsl_TExprDef.TConst(hxsl_Const.CInt(i)));
 											out.push(this.evalExpr(_g56,false));
 										}
 										this.constants.remove(_g57.id);
@@ -23357,7 +21137,7 @@ class hxsl_Flatten {
 		switch(_g._hx_index) {
 		case 1:
 			let _g1 = _g.v;
-			let a = this.varMap.h[_g1.__id__];
+			let a = this.varMap.get(_g1);
 			if(a != null) {
 				e = this.access(a,_g1.type,e.p,hxsl_ARead.AIndex(a));
 			}
@@ -23372,7 +21152,7 @@ class hxsl_Flatten {
 				let eindex = _g2;
 				let _g1 = _g2.e;
 				if(!(_g1._hx_index == 0 && _g1.c._hx_index == 2)) {
-					let a = this.varMap.h[_g.__id__];
+					let a = this.varMap.get(_g);
 					if(a != null) {
 						let _g1 = _g.type;
 						if(_g1._hx_index == 15) {
@@ -23384,7 +21164,7 @@ class hxsl_Flatten {
 							stride >>= 2;
 							eindex = this.mapExpr(_g2);
 							let toInt = { e : hxsl_TExprDef.TCall({ e : hxsl_TExprDef.TGlobal(hxsl_TGlobal.ToInt), t : hxsl_Type.TFun([]), p : _g4},[eindex]), t : hxsl_Type.TInt, p : _g4};
-							e = this.access(a,_g,_g4,hxsl_ARead.AOffset(a,stride,stride == 1 ? toInt : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpMult,toInt,{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(stride)), t : hxsl_Type.TInt, p : _g4}), t : hxsl_Type.TInt, p : _g4}));
+							e = this.access(a,_g,_g4,hxsl_ARead.AOffset(a,stride,stride == 1 ? toInt : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpMult,toInt,this.mkInt(stride,_g4)), t : hxsl_Type.TInt, p : _g4}));
 						} else {
 							throw haxe_Exception.thrown("assert");
 						}
@@ -23637,145 +21417,114 @@ class hxsl_Flatten {
 			throw haxe_Exception.thrown("assert");
 		}
 	}
+	mkInt(v,pos) {
+		return { e : hxsl_TExprDef.TConst(hxsl_Const.CInt(v)), t : hxsl_Type.TInt, p : pos};
+	}
+	readIndex(a,index,pos) {
+		return { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(a.g), t : a.g.type, p : pos},this.mkInt((a.pos >> 2) + index,pos)), t : hxsl_Type.TVec(4,a.t), p : pos};
+	}
+	readOffset(a,stride,delta,index,pos) {
+		let index1 = (a.pos >> 2) + index;
+		let offset = index1 == 0 ? delta : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpAdd,delta,this.mkInt(index1,pos)), t : hxsl_Type.TInt, p : pos};
+		return { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(a.g), t : a.g.type, p : pos},offset), t : hxsl_Type.TVec(4,a.t), p : pos};
+	}
 	access(a,t,pos,acc) {
 		switch(t._hx_index) {
 		case 6:
 			let tmp = this.access(a,hxsl_Type.TMat3x4,pos,acc);
 			return { e : hxsl_TExprDef.TCall({ e : hxsl_TExprDef.TGlobal(hxsl_TGlobal.Mat3), t : hxsl_Type.TFun([]), p : pos},[tmp]), t : hxsl_Type.TMat3, p : pos};
 		case 7:
-			let tmp1 = hxsl_TExprDef.TGlobal(hxsl_TGlobal.Mat4);
-			let tmp2 = hxsl_Type.TFun([]);
+			let tmp1 = { e : hxsl_TExprDef.TGlobal(hxsl_TGlobal.Mat4), t : hxsl_Type.TFun([]), p : pos};
+			let tmp2;
+			switch(acc._hx_index) {
+			case 0:
+				tmp2 = this.readIndex(acc.a,0,pos);
+				break;
+			case 1:
+				tmp2 = this.readOffset(acc.a,acc.stride,acc.delta,0,pos);
+				break;
+			}
 			let tmp3;
 			switch(acc._hx_index) {
 			case 0:
-				let _g = acc.a;
-				tmp3 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g.g), t : _g.g.type, p : pos},{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(_g.pos >> 2)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TVec(4,_g.t), p : pos};
+				tmp3 = this.readIndex(acc.a,1,pos);
 				break;
 			case 1:
-				let _g1 = acc.delta;
-				let _g2 = acc.a;
-				let index = _g2.pos >> 2;
-				let offset = index == 0 ? _g1 : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpAdd,_g1,{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(index)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TInt, p : pos};
-				tmp3 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g2.g), t : _g2.g.type, p : pos},offset), t : hxsl_Type.TVec(4,_g2.t), p : pos};
+				tmp3 = this.readOffset(acc.a,acc.stride,acc.delta,1,pos);
 				break;
 			}
 			let tmp4;
 			switch(acc._hx_index) {
 			case 0:
-				let _g3 = acc.a;
-				tmp4 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g3.g), t : _g3.g.type, p : pos},{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt((_g3.pos >> 2) + 1)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TVec(4,_g3.t), p : pos};
+				tmp4 = this.readIndex(acc.a,2,pos);
 				break;
 			case 1:
-				let _g4 = acc.delta;
-				let _g5 = acc.a;
-				let index1 = (_g5.pos >> 2) + 1;
-				let offset1 = index1 == 0 ? _g4 : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpAdd,_g4,{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(index1)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TInt, p : pos};
-				tmp4 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g5.g), t : _g5.g.type, p : pos},offset1), t : hxsl_Type.TVec(4,_g5.t), p : pos};
+				tmp4 = this.readOffset(acc.a,acc.stride,acc.delta,2,pos);
 				break;
 			}
 			let tmp5;
 			switch(acc._hx_index) {
 			case 0:
-				let _g6 = acc.a;
-				tmp5 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g6.g), t : _g6.g.type, p : pos},{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt((_g6.pos >> 2) + 2)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TVec(4,_g6.t), p : pos};
+				tmp5 = this.readIndex(acc.a,3,pos);
 				break;
 			case 1:
-				let _g7 = acc.delta;
-				let _g8 = acc.a;
-				let index2 = (_g8.pos >> 2) + 2;
-				let offset2 = index2 == 0 ? _g7 : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpAdd,_g7,{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(index2)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TInt, p : pos};
-				tmp5 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g8.g), t : _g8.g.type, p : pos},offset2), t : hxsl_Type.TVec(4,_g8.t), p : pos};
+				tmp5 = this.readOffset(acc.a,acc.stride,acc.delta,3,pos);
 				break;
 			}
-			let tmp6;
+			return { e : hxsl_TExprDef.TCall(tmp1,[tmp2,tmp3,tmp4,tmp5]), t : hxsl_Type.TMat4, p : pos};
+		case 8:
+			let tmp6 = { e : hxsl_TExprDef.TGlobal(hxsl_TGlobal.Mat3x4), t : hxsl_Type.TFun([]), p : pos};
+			let tmp7;
 			switch(acc._hx_index) {
 			case 0:
-				let _g9 = acc.a;
-				tmp6 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g9.g), t : _g9.g.type, p : pos},{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt((_g9.pos >> 2) + 3)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TVec(4,_g9.t), p : pos};
+				tmp7 = this.readIndex(acc.a,0,pos);
 				break;
 			case 1:
-				let _g10 = acc.delta;
-				let _g11 = acc.a;
-				let index3 = (_g11.pos >> 2) + 3;
-				let offset3 = index3 == 0 ? _g10 : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpAdd,_g10,{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(index3)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TInt, p : pos};
-				tmp6 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g11.g), t : _g11.g.type, p : pos},offset3), t : hxsl_Type.TVec(4,_g11.t), p : pos};
+				tmp7 = this.readOffset(acc.a,acc.stride,acc.delta,0,pos);
 				break;
 			}
-			return { e : hxsl_TExprDef.TCall({ e : tmp1, t : tmp2, p : pos},[tmp3,tmp4,tmp5,tmp6]), t : hxsl_Type.TMat4, p : pos};
-		case 8:
-			let tmp7 = hxsl_TExprDef.TGlobal(hxsl_TGlobal.Mat3x4);
-			let tmp8 = hxsl_Type.TFun([]);
+			let tmp8;
+			switch(acc._hx_index) {
+			case 0:
+				tmp8 = this.readIndex(acc.a,1,pos);
+				break;
+			case 1:
+				tmp8 = this.readOffset(acc.a,acc.stride,acc.delta,1,pos);
+				break;
+			}
 			let tmp9;
 			switch(acc._hx_index) {
 			case 0:
-				let _g12 = acc.a;
-				tmp9 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g12.g), t : _g12.g.type, p : pos},{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(_g12.pos >> 2)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TVec(4,_g12.t), p : pos};
+				tmp9 = this.readIndex(acc.a,2,pos);
 				break;
 			case 1:
-				let _g13 = acc.delta;
-				let _g14 = acc.a;
-				let index4 = _g14.pos >> 2;
-				let offset4 = index4 == 0 ? _g13 : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpAdd,_g13,{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(index4)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TInt, p : pos};
-				tmp9 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g14.g), t : _g14.g.type, p : pos},offset4), t : hxsl_Type.TVec(4,_g14.t), p : pos};
+				tmp9 = this.readOffset(acc.a,acc.stride,acc.delta,2,pos);
 				break;
 			}
-			let tmp10;
-			switch(acc._hx_index) {
-			case 0:
-				let _g15 = acc.a;
-				tmp10 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g15.g), t : _g15.g.type, p : pos},{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt((_g15.pos >> 2) + 1)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TVec(4,_g15.t), p : pos};
-				break;
-			case 1:
-				let _g16 = acc.delta;
-				let _g17 = acc.a;
-				let index5 = (_g17.pos >> 2) + 1;
-				let offset5 = index5 == 0 ? _g16 : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpAdd,_g16,{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(index5)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TInt, p : pos};
-				tmp10 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g17.g), t : _g17.g.type, p : pos},offset5), t : hxsl_Type.TVec(4,_g17.t), p : pos};
-				break;
-			}
-			let tmp11;
-			switch(acc._hx_index) {
-			case 0:
-				let _g18 = acc.a;
-				tmp11 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g18.g), t : _g18.g.type, p : pos},{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt((_g18.pos >> 2) + 2)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TVec(4,_g18.t), p : pos};
-				break;
-			case 1:
-				let _g19 = acc.delta;
-				let _g20 = acc.a;
-				let index6 = (_g20.pos >> 2) + 2;
-				let offset6 = index6 == 0 ? _g19 : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpAdd,_g19,{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(index6)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TInt, p : pos};
-				tmp11 = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g20.g), t : _g20.g.type, p : pos},offset6), t : hxsl_Type.TVec(4,_g20.t), p : pos};
-				break;
-			}
-			return { e : hxsl_TExprDef.TCall({ e : tmp7, t : tmp8, p : pos},[tmp9,tmp10,tmp11]), t : hxsl_Type.TMat3x4, p : pos};
+			return { e : hxsl_TExprDef.TCall(tmp6,[tmp7,tmp8,tmp9]), t : hxsl_Type.TMat3x4, p : pos};
 		case 15:
-			let _g21 = t.size;
-			let _g22 = t.t;
-			if(_g21._hx_index == 0) {
-				let _g = _g21.v;
-				let stride = a.size / _g | 0;
-				let _g1 = [];
-				let _g2 = 0;
-				while(_g2 < _g) {
-					let i = _g2++;
+			let _g = t.size;
+			let _g1 = t.t;
+			if(_g._hx_index == 0) {
+				let _g2 = _g.v;
+				let stride = Std.int(a.size / _g2);
+				let _g3 = [];
+				let _g4 = 0;
+				while(_g4 < _g2) {
+					let i = _g4++;
 					let a1 = new hxsl__$Flatten_Alloc(a.g,a.t,a.pos + stride * i,stride);
-					_g1.push(this.access(a1,_g22,pos,hxsl_ARead.AIndex(a1)));
+					_g3.push(this.access(a1,_g1,pos,hxsl_ARead.AIndex(a1)));
 				}
-				return { e : hxsl_TExprDef.TArrayDecl(_g1), t : _g22, p : pos};
+				return { e : hxsl_TExprDef.TArrayDecl(_g3), t : _g1, p : pos};
 			} else {
 				if(hxsl_Tools.isSampler(t)) {
 					let e;
 					switch(acc._hx_index) {
 					case 0:
-						let _g = acc.a;
-						e = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g.g), t : _g.g.type, p : pos},{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(_g.pos >> 2)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TVec(4,_g.t), p : pos};
+						e = this.readIndex(acc.a,0,pos);
 						break;
 					case 1:
-						let _g1 = acc.delta;
-						let _g2 = acc.a;
-						let index = _g2.pos >> 2;
-						let offset = index == 0 ? _g1 : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpAdd,_g1,{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(index)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TInt, p : pos};
-						e = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g2.g), t : _g2.g.type, p : pos},offset), t : hxsl_Type.TVec(4,_g2.t), p : pos};
+						e = this.readOffset(acc.a,acc.stride,acc.delta,0,pos);
 						break;
 					}
 					e.t = t;
@@ -23788,15 +21537,10 @@ class hxsl_Flatten {
 				let e;
 				switch(acc._hx_index) {
 				case 0:
-					let _g = acc.a;
-					e = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g.g), t : _g.g.type, p : pos},{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(_g.pos >> 2)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TVec(4,_g.t), p : pos};
+					e = this.readIndex(acc.a,0,pos);
 					break;
 				case 1:
-					let _g1 = acc.delta;
-					let _g2 = acc.a;
-					let index = _g2.pos >> 2;
-					let offset = index == 0 ? _g1 : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpAdd,_g1,{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(index)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TInt, p : pos};
-					e = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g2.g), t : _g2.g.type, p : pos},offset), t : hxsl_Type.TVec(4,_g2.t), p : pos};
+					e = this.readOffset(acc.a,acc.stride,acc.delta,0,pos);
 					break;
 				}
 				if(size == 4) {
@@ -23818,10 +21562,10 @@ class hxsl_Flatten {
 					e = { e : hxsl_TExprDef.TCall({ e : hxsl_TExprDef.TGlobal(hxsl_TGlobal.ToInt), t : hxsl_Type.TFun([]), p : pos},[e]), t : t, p : pos};
 					break;
 				case 5:
-					let _g3 = t.size;
+					let _g = t.size;
 					if(t.t._hx_index == 0) {
-						e.t = hxsl_Type.TVec(_g3,hxsl_VecType.VFloat);
-						e = { e : hxsl_TExprDef.TCall({ e : hxsl_TExprDef.TGlobal([hxsl_TGlobal.IVec2,hxsl_TGlobal.IVec3,hxsl_TGlobal.IVec4][_g3 - 2]), t : hxsl_Type.TFun([]), p : pos},[e]), t : t, p : pos};
+						e.t = hxsl_Type.TVec(_g,hxsl_VecType.VFloat);
+						e = { e : hxsl_TExprDef.TCall({ e : hxsl_TExprDef.TGlobal([hxsl_TGlobal.IVec2,hxsl_TGlobal.IVec3,hxsl_TGlobal.IVec4][_g - 2]), t : hxsl_Type.TFun([]), p : pos},[e]), t : t, p : pos};
 					}
 					break;
 				default:
@@ -23834,15 +21578,10 @@ class hxsl_Flatten {
 				let e;
 				switch(acc._hx_index) {
 				case 0:
-					let _g = acc.a;
-					e = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g.g), t : _g.g.type, p : pos},{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(_g.pos >> 2)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TVec(4,_g.t), p : pos};
+					e = this.readIndex(acc.a,0,pos);
 					break;
 				case 1:
-					let _g1 = acc.delta;
-					let _g2 = acc.a;
-					let index = _g2.pos >> 2;
-					let offset = index == 0 ? _g1 : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpAdd,_g1,{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(index)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TInt, p : pos};
-					e = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g2.g), t : _g2.g.type, p : pos},offset), t : hxsl_Type.TVec(4,_g2.t), p : pos};
+					e = this.readOffset(acc.a,acc.stride,acc.delta,0,pos);
 					break;
 				}
 				e.t = t;
@@ -23855,15 +21594,10 @@ class hxsl_Flatten {
 			let e;
 			switch(acc._hx_index) {
 			case 0:
-				let _g23 = acc.a;
-				e = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g23.g), t : _g23.g.type, p : pos},{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(_g23.pos >> 2)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TVec(4,_g23.t), p : pos};
+				e = this.readIndex(acc.a,0,pos);
 				break;
 			case 1:
-				let _g24 = acc.delta;
-				let _g25 = acc.a;
-				let index7 = _g25.pos >> 2;
-				let offset7 = index7 == 0 ? _g24 : { e : hxsl_TExprDef.TBinop(haxe_macro_Binop.OpAdd,_g24,{ e : hxsl_TExprDef.TConst(hxsl_Const.CInt(index7)), t : hxsl_Type.TInt, p : pos}), t : hxsl_Type.TInt, p : pos};
-				e = { e : hxsl_TExprDef.TArray({ e : hxsl_TExprDef.TVar(_g25.g), t : _g25.g.type, p : pos},offset7), t : hxsl_Type.TVec(4,_g25.t), p : pos};
+				e = this.readOffset(acc.a,acc.stride,acc.delta,0,pos);
 				break;
 			}
 			if(size == 4) {
@@ -23885,10 +21619,10 @@ class hxsl_Flatten {
 				e = { e : hxsl_TExprDef.TCall({ e : hxsl_TExprDef.TGlobal(hxsl_TGlobal.ToInt), t : hxsl_Type.TFun([]), p : pos},[e]), t : t, p : pos};
 				break;
 			case 5:
-				let _g26 = t.size;
+				let _g2 = t.size;
 				if(t.t._hx_index == 0) {
-					e.t = hxsl_Type.TVec(_g26,hxsl_VecType.VFloat);
-					e = { e : hxsl_TExprDef.TCall({ e : hxsl_TExprDef.TGlobal([hxsl_TGlobal.IVec2,hxsl_TGlobal.IVec3,hxsl_TGlobal.IVec4][_g26 - 2]), t : hxsl_Type.TFun([]), p : pos},[e]), t : t, p : pos};
+					e.t = hxsl_Type.TVec(_g2,hxsl_VecType.VFloat);
+					e = { e : hxsl_TExprDef.TCall({ e : hxsl_TExprDef.TGlobal([hxsl_TGlobal.IVec2,hxsl_TGlobal.IVec3,hxsl_TGlobal.IVec4][_g2 - 2]), t : hxsl_Type.TFun([]), p : pos},[e]), t : t, p : pos};
 				}
 				break;
 			default:
@@ -24135,9 +21869,16 @@ class hxsl_Globals {
 		this.map = new haxe_ds_IntMap();
 	}
 	set(path,v) {
-		let this1 = this.map;
-		let key = hxsl_Globals.allocID(path);
-		this1.h[key] = v;
+		this.map.set(hxsl_Globals.allocID(path),v);
+	}
+	fastSet(id,v) {
+		this.map.set(id,v);
+	}
+	fastGet(id) {
+		return this.map.get(id);
+	}
+	resetChannels() {
+		this.maxChannels = 0;
 	}
 	allocChannelID(t) {
 		let _g = 0;
@@ -24160,11 +21901,11 @@ class hxsl_Globals {
 			hxsl_Globals.MAP = new haxe_ds_StringMap();
 			hxsl_Globals.ALL = [];
 		}
-		let id = hxsl_Globals.MAP.h[path];
+		let id = hxsl_Globals.MAP.get(path);
 		if(id == null) {
 			id = hxsl_Globals.ALL.length;
 			hxsl_Globals.ALL.push(path);
-			hxsl_Globals.MAP.h[path] = id;
+			hxsl_Globals.MAP.set(path,id);
 		}
 		return id;
 	}
@@ -24174,6 +21915,15 @@ Object.assign(hxsl_Globals.prototype, {
 	__class__: hxsl_Globals
 });
 class js_Boot {
+	static isClass(o) {
+		return o.__name__;
+	}
+	static isInterface(o) {
+		return o.__isInterface__;
+	}
+	static isEnum(e) {
+		return e.__ename__;
+	}
 	static getClass(o) {
 		if(o == null) {
 			return null;
@@ -24199,7 +21949,7 @@ class js_Boot {
 			return "<...>";
 		}
 		let t = typeof(o);
-		if(t == "function" && (o.__name__ || o.__ename__)) {
+		if(t == "function" && (js_Boot.isClass(o) || js_Boot.isEnum(o))) {
 			t = "object";
 		}
 		switch(t) {
@@ -24283,12 +22033,94 @@ class js_Boot {
 			return String(o);
 		}
 	}
+	static __interfLoop(cc,cl) {
+		while(true) {
+			if(cc == null) {
+				return false;
+			}
+			if(cc == cl) {
+				return true;
+			}
+			let intf = cc.__interfaces__;
+			if(intf != null && (cc.__super__ == null || cc.__super__.__interfaces__ != intf)) {
+				let _g = 0;
+				let _g1 = intf.length;
+				while(_g < _g1) {
+					let i = _g++;
+					let i1 = intf[i];
+					if(i1 == cl || js_Boot.__interfLoop(i1,cl)) {
+						return true;
+					}
+				}
+			}
+			cc = cc.__super__;
+		}
+	}
+	static __instanceof(o,cl) {
+		if(cl == null) {
+			return false;
+		}
+		switch(cl) {
+		case Array:
+			return ((o) instanceof Array);
+		case Bool:
+			return typeof(o) == "boolean";
+		case Dynamic:
+			return o != null;
+		case Float:
+			return typeof(o) == "number";
+		case Int:
+			if(typeof(o) == "number") {
+				return ((o | 0) === o);
+			} else {
+				return false;
+			}
+			break;
+		case String:
+			return typeof(o) == "string";
+		default:
+			if(o != null) {
+				if(typeof(cl) == "function") {
+					if(js_Boot.__downcastCheck(o,cl)) {
+						return true;
+					}
+				} else if(typeof(cl) == "object" && js_Boot.__isNativeObj(cl)) {
+					if(((o) instanceof cl)) {
+						return true;
+					}
+				}
+			} else {
+				return false;
+			}
+			if(cl == Class ? o.__name__ != null : false) {
+				return true;
+			}
+			if(cl == Enum ? o.__ename__ != null : false) {
+				return true;
+			}
+			return o.__enum__ != null ? $hxEnums[o.__enum__] == cl : false;
+		}
+	}
+	static __downcastCheck(o,cl) {
+		if(!((o) instanceof cl)) {
+			if(js_Boot.isInterface(cl)) {
+				return js_Boot.__interfLoop(js_Boot.getClass(o),cl);
+			} else {
+				return false;
+			}
+		} else {
+			return true;
+		}
+	}
 	static __nativeClassName(o) {
 		let name = js_Boot.__toStr.call(o).slice(8,-1);
 		if(name == "Object" || name == "Function" || name == "Math" || name == "JSON") {
 			return null;
 		}
 		return name;
+	}
+	static __isNativeObj(o) {
+		return js_Boot.__nativeClassName(o) != null;
 	}
 	static __resolveNativeClass(name) {
 		return $global[name];
@@ -24302,6 +22134,22 @@ class hxsl_GlslOut {
 		this.exprIds = 0;
 		this.varNames = new haxe_ds_IntMap();
 		this.allNames = new haxe_ds_StringMap();
+	}
+	get_isES() {
+		return this.glES != null;
+	}
+	get_isES2() {
+		if(this.glES != null) {
+			return this.glES <= 2;
+		} else {
+			return false;
+		}
+	}
+	add(v) {
+		this.buf.add(v);
+	}
+	ident(v) {
+		this.add(this.varName(v));
 	}
 	decl(s) {
 		let _g = 0;
@@ -24322,104 +22170,103 @@ class hxsl_GlslOut {
 	addType(t) {
 		switch(t._hx_index) {
 		case 0:
-			this.buf.b += "void";
+			this.add("void");
 			break;
 		case 1:
-			this.buf.b += "int";
+			this.add("int");
 			break;
 		case 2:
-			this.buf.b += "bool";
+			this.add("bool");
 			break;
 		case 3:
-			this.buf.b += "float";
+			this.add("float");
 			break;
 		case 4:
-			this.buf.b += "string";
+			this.add("string");
 			break;
 		case 5:
 			let _g = t.size;
 			switch(t.t._hx_index) {
 			case 0:
-				this.buf.b += "i";
+				this.add("i");
 				break;
 			case 1:
 				break;
 			case 2:
-				this.buf.b += "b";
+				this.add("b");
 				break;
 			}
-			this.buf.b += "vec";
-			this.buf.b += Std.string(_g);
+			this.add("vec");
+			this.add(_g);
 			break;
 		case 6:
-			this.buf.b += "mat3";
+			this.add("mat3");
 			break;
 		case 7:
-			this.buf.b += "mat4";
+			this.add("mat4");
 			break;
 		case 8:
 			this.decl(hxsl_GlslOut.MAT34);
-			this.buf.b += "_mat3x4";
+			this.add("_mat3x4");
 			break;
 		case 9:
-			this.buf.b += "vec";
-			this.buf.b += Std.string(t.size);
+			this.add("vec");
+			this.add(t.size);
 			break;
 		case 10:
-			this.buf.b += "sampler2D";
+			this.add("sampler2D");
 			break;
 		case 11:
-			this.buf.b += "sampler2DArray";
-			if(this.glES != null) {
+			this.add("sampler2DArray");
+			if(this.get_isES()) {
 				this.decl("precision lowp sampler2DArray;");
 			}
 			break;
 		case 12:
-			this.buf.b += "samplerCube";
+			this.add("samplerCube");
 			break;
 		case 13:
 			let _g1 = t.vl;
-			this.buf.b += "struct { ";
+			this.add("struct { ");
 			let _g2 = 0;
 			while(_g2 < _g1.length) {
 				let v = _g1[_g2];
 				++_g2;
 				this.addVar(v);
-				this.buf.b += ";";
+				this.add(";");
 			}
-			this.buf.b += " }";
+			this.add(" }");
 			break;
 		case 14:
-			this.buf.b += "function";
+			this.add("function");
 			break;
 		case 15:
 			let _g3 = t.size;
 			this.addType(t.t);
-			this.buf.b += "[";
+			this.add("[");
 			switch(_g3._hx_index) {
 			case 0:
 				let _g4 = _g3.v;
 				if(_g4 == 1) {
 					if(this.intelDriverFix) {
-						this.buf.b += "2";
+						this.add(2);
 					} else {
-						this.buf.b += Std.string(_g4);
+						this.add(_g4);
 					}
 				} else {
-					this.buf.b += Std.string(_g4);
+					this.add(_g4);
 				}
 				break;
 			case 1:
-				let v = this.varName(_g3.v);
-				this.buf.b += Std.string(v);
+				this.ident(_g3.v);
 				break;
 			}
-			this.buf.b += "]";
+			this.add("]");
 			break;
 		case 16:
 			throw haxe_Exception.thrown("assert");
 		case 17:
-			this.buf.b += Std.string("channel" + t.size);
+			this.add("channel" + t.size);
 			break;
 		}
 	}
@@ -24432,42 +22279,40 @@ class hxsl_GlslOut {
 			v.type = _g.t;
 			this.addVar(v);
 			v.type = old;
-			this.buf.b += "[";
+			this.add("[");
 			switch(_g1._hx_index) {
 			case 0:
 				let _g2 = _g1.v;
 				if(_g2 == 1) {
 					if(this.intelDriverFix) {
-						this.buf.b += "2";
+						this.add(2);
 					} else {
-						this.buf.b += Std.string(_g2);
+						this.add(_g2);
 					}
 				} else {
-					this.buf.b += Std.string(_g2);
+					this.add(_g2);
 				}
 				break;
 			case 1:
-				let v1 = this.varName(_g1.v);
-				this.buf.b += Std.string(v1);
+				this.ident(_g1.v);
 				break;
 			}
-			this.buf.b += "]";
+			this.add("]");
 			break;
 		case 16:
 			let _g3 = _g.size;
 			let _g4 = _g.t;
-			this.buf.b += Std.string("uniform_buffer" + this.uniformBuffer++);
-			this.buf.b += " { ";
+			this.add("uniform_buffer" + this.uniformBuffer++);
+			this.add(" { ");
 			v.type = hxsl_Type.TArray(_g4,_g3);
 			this.addVar(v);
 			v.type = hxsl_Type.TBuffer(_g4,_g3);
-			this.buf.b += "; }";
+			this.add("; }");
 			break;
 		default:
 			this.addType(v.type);
-			this.buf.b += " ";
-			let v2 = this.varName(v);
-			this.buf.b += Std.string(v2);
+			this.add(" ");
+			this.ident(v);
 		}
 	}
 	addValue(e,tabs) {
@@ -24478,25 +22323,25 @@ class hxsl_GlslOut {
 			let tmp = this.buf;
 			this.buf = new StringBuf();
 			this.addType(e.t);
-			this.buf.b += " ";
-			this.buf.b += Std.string(name);
-			this.buf.b += "(void)";
+			this.add(" ");
+			this.add(name);
+			this.add("(void)");
 			let el2 = _g.el.slice();
 			let last = el2[el2.length - 1];
 			el2[el2.length - 1] = { e : hxsl_TExprDef.TReturn(last), t : e.t, p : last.p};
 			let e2 = { t : hxsl_Type.TVoid, e : hxsl_TExprDef.TBlock(el2), p : e.p};
 			this.addExpr(e2,"");
-			this.exprValues.push(this.buf.b);
+			this.exprValues.push(this.buf.toString());
 			this.buf = tmp;
-			this.buf.b += Std.string(name);
-			this.buf.b += "()";
+			this.add(name);
+			this.add("()");
 			break;
 		case 10:
-			this.buf.b += "( ";
+			this.add("( ");
 			this.addValue(_g.econd,tabs);
-			this.buf.b += " ) ? ";
+			this.add(" ) ? ");
 			this.addValue(_g.eif,tabs);
-			this.buf.b += " : ";
+			this.add(" : ");
 			this.addValue(_g.eelse,tabs);
 			break;
 		case 20:
@@ -24512,7 +22357,7 @@ class hxsl_GlslOut {
 	getFunName(g,args,rt) {
 		switch(g._hx_index) {
 		case 20:
-			if(rt == hxsl_Type.TInt && this.glES != null) {
+			if(rt == hxsl_Type.TInt && this.get_isES()) {
 				this.decl("int _imod( int x, int y ) { return int(mod(float(x),float(y))); }");
 				return "_imod";
 			}
@@ -24520,17 +22365,17 @@ class hxsl_GlslOut {
 		case 33:
 			switch(args[0].t._hx_index) {
 			case 10:case 11:
-				if(this.glES != null && this.glES <= 2) {
+				if(this.get_isES2()) {
 					return "texture2D";
 				}
 				break;
 			case 12:
-				if(this.glES != null && this.glES <= 2) {
+				if(this.get_isES2()) {
 					return "textureCube";
 				}
 				break;
 			case 17:
-				if(this.glES != null && this.glES <= 2) {
+				if(this.get_isES2()) {
 					return "texture2D";
 				}
 				break;
@@ -24540,19 +22385,19 @@ class hxsl_GlslOut {
 		case 34:
 			switch(args[0].t._hx_index) {
 			case 10:case 11:
-				if(this.glES != null && this.glES <= 2) {
+				if(this.get_isES2()) {
 					this.decl("#extension GL_EXT_shader_texture_lod : enable");
 					return "texture2DLodEXT";
 				}
 				break;
 			case 12:
-				if(this.glES != null && this.glES <= 2) {
+				if(this.get_isES2()) {
 					this.decl("#extension GL_EXT_shader_texture_lod : enable");
 					return "textureCubeLodEXT";
 				}
 				break;
 			case 17:
-				if(this.glES != null && this.glES <= 2) {
+				if(this.get_isES2()) {
 					this.decl("#extension GL_EXT_shader_texture_lod : enable");
 					return "texture2DLodEXT";
 				}
@@ -24608,53 +22453,51 @@ class hxsl_GlslOut {
 			let _g1 = _g.c;
 			switch(_g1._hx_index) {
 			case 0:
-				this.buf.b += "null";
+				this.add("null");
 				break;
 			case 1:
-				this.buf.b += Std.string(_g1.b);
+				this.add(_g1.b);
 				break;
 			case 2:
-				this.buf.b += Std.string(_g1.v);
+				this.add(_g1.v);
 				break;
 			case 3:
 				let str = "" + _g1.v;
-				this.buf.b += Std.string(str);
+				this.add(str);
 				if(str.indexOf(".") == -1 && str.indexOf("e") == -1) {
-					this.buf.b += ".";
+					this.add(".");
 				}
 				break;
 			case 4:
-				this.buf.b += Std.string("\"" + _g1.v + "\"");
+				this.add("\"" + _g1.v + "\"");
 				break;
 			}
 			break;
 		case 1:
-			let v = this.varName(_g.v);
-			this.buf.b += Std.string(v);
+			this.ident(_g.v);
 			break;
 		case 2:
-			let v1 = hxsl_GlslOut.GLOBALS.get(_g.g);
-			this.buf.b += Std.string(v1);
+			this.add(hxsl_GlslOut.GLOBALS.get(_g.g));
 			break;
 		case 3:
-			this.buf.b += "(";
+			this.add("(");
 			this.addValue(_g.e,tabs);
-			this.buf.b += ")";
+			this.add(")");
 			break;
 		case 4:
 			let _g2 = _g.el;
-			this.buf.b += "{\n";
+			this.add("{\n");
 			let t2 = tabs + "\t";
 			let _g3 = 0;
 			while(_g3 < _g2.length) {
 				let e = _g2[_g3];
 				++_g3;
-				this.buf.b += Std.string(t2);
+				this.add(t2);
 				this.addExpr(e,t2);
 				this.newLine(e);
 			}
-			this.buf.b += Std.string(tabs);
-			this.buf.b += "}";
+			this.add(tabs);
+			this.add("}");
 			break;
 		case 5:
 			let _g4 = _g.e2;
@@ -24672,350 +22515,350 @@ class hxsl_GlslOut {
 								this.decl("vec3 m3x4mult( vec3 v, _mat3x4 m) { vec4 ve = vec4(v,1.0); return vec3(dot(m.a,ve),dot(m.b,ve),dot(m.c,ve)); }");
 								if(_g6._hx_index == 20) {
 									this.addValue(_g5,tabs);
-									this.buf.b += " = ";
+									this.add(" = ");
 								}
-								this.buf.b += "m3x4mult(";
+								this.add("m3x4mult(");
 								this.addValue(_g5,tabs);
-								this.buf.b += ",";
+								this.add(",");
 								this.addValue(_g4,tabs);
-								this.buf.b += ")";
+								this.add(")");
 							} else {
 								this.addValue(_g5,tabs);
-								this.buf.b += " ";
-								this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-								this.buf.b += " ";
+								this.add(" ");
+								this.add(hxsl_Printer.opStr(_g6));
+								this.add(" ");
 								this.addValue(_g4,tabs);
 							}
 						} else {
 							this.addValue(_g5,tabs);
-							this.buf.b += " ";
-							this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-							this.buf.b += " ";
+							this.add(" ");
+							this.add(hxsl_Printer.opStr(_g6));
+							this.add(" ");
 							this.addValue(_g4,tabs);
 						}
 					} else {
 						this.addValue(_g5,tabs);
-						this.buf.b += " ";
-						this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-						this.buf.b += " ";
+						this.add(" ");
+						this.add(hxsl_Printer.opStr(_g6));
+						this.add(" ");
 						this.addValue(_g4,tabs);
 					}
 				} else {
 					this.addValue(_g5,tabs);
-					this.buf.b += " ";
-					this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-					this.buf.b += " ";
+					this.add(" ");
+					this.add(hxsl_Printer.opStr(_g6));
+					this.add(" ");
 					this.addValue(_g4,tabs);
 				}
 				break;
 			case 5:
 				if(_g8._hx_index == 5) {
 					if(_g7._hx_index == 5) {
-						this.buf.b += Std.string("vec" + _g8.size + "(");
-						let v;
+						this.add("vec" + _g8.size + "(");
+						let tmp;
 						switch(_g6._hx_index) {
 						case 5:
-							v = "equal";
+							tmp = "equal";
 							break;
 						case 6:
-							v = "notEqual";
+							tmp = "notEqual";
 							break;
 						case 7:
-							v = "greaterThan";
+							tmp = "greaterThan";
 							break;
 						case 8:
-							v = "greaterThanEqual";
+							tmp = "greaterThanEqual";
 							break;
 						case 9:
-							v = "lessThan";
+							tmp = "lessThan";
 							break;
 						case 10:
-							v = "lessThanEqual";
+							tmp = "lessThanEqual";
 							break;
 						default:
 							throw haxe_Exception.thrown("assert");
 						}
-						this.buf.b += Std.string(v);
-						this.buf.b += "(";
+						this.add(tmp);
+						this.add("(");
 						this.addValue(_g5,tabs);
-						this.buf.b += ",";
+						this.add(",");
 						this.addValue(_g4,tabs);
-						this.buf.b += "))";
+						this.add("))");
 					} else {
 						this.addValue(_g5,tabs);
-						this.buf.b += " ";
-						this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-						this.buf.b += " ";
+						this.add(" ");
+						this.add(hxsl_Printer.opStr(_g6));
+						this.add(" ");
 						this.addValue(_g4,tabs);
 					}
 				} else {
 					this.addValue(_g5,tabs);
-					this.buf.b += " ";
-					this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-					this.buf.b += " ";
+					this.add(" ");
+					this.add(hxsl_Printer.opStr(_g6));
+					this.add(" ");
 					this.addValue(_g4,tabs);
 				}
 				break;
 			case 6:
 				if(_g8._hx_index == 5) {
 					if(_g7._hx_index == 5) {
-						this.buf.b += Std.string("vec" + _g8.size + "(");
-						let v;
+						this.add("vec" + _g8.size + "(");
+						let tmp;
 						switch(_g6._hx_index) {
 						case 5:
-							v = "equal";
+							tmp = "equal";
 							break;
 						case 6:
-							v = "notEqual";
+							tmp = "notEqual";
 							break;
 						case 7:
-							v = "greaterThan";
+							tmp = "greaterThan";
 							break;
 						case 8:
-							v = "greaterThanEqual";
+							tmp = "greaterThanEqual";
 							break;
 						case 9:
-							v = "lessThan";
+							tmp = "lessThan";
 							break;
 						case 10:
-							v = "lessThanEqual";
+							tmp = "lessThanEqual";
 							break;
 						default:
 							throw haxe_Exception.thrown("assert");
 						}
-						this.buf.b += Std.string(v);
-						this.buf.b += "(";
+						this.add(tmp);
+						this.add("(");
 						this.addValue(_g5,tabs);
-						this.buf.b += ",";
+						this.add(",");
 						this.addValue(_g4,tabs);
-						this.buf.b += "))";
+						this.add("))");
 					} else {
 						this.addValue(_g5,tabs);
-						this.buf.b += " ";
-						this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-						this.buf.b += " ";
+						this.add(" ");
+						this.add(hxsl_Printer.opStr(_g6));
+						this.add(" ");
 						this.addValue(_g4,tabs);
 					}
 				} else {
 					this.addValue(_g5,tabs);
-					this.buf.b += " ";
-					this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-					this.buf.b += " ";
+					this.add(" ");
+					this.add(hxsl_Printer.opStr(_g6));
+					this.add(" ");
 					this.addValue(_g4,tabs);
 				}
 				break;
 			case 7:
 				if(_g8._hx_index == 5) {
 					if(_g7._hx_index == 5) {
-						this.buf.b += Std.string("vec" + _g8.size + "(");
-						let v;
+						this.add("vec" + _g8.size + "(");
+						let tmp;
 						switch(_g6._hx_index) {
 						case 5:
-							v = "equal";
+							tmp = "equal";
 							break;
 						case 6:
-							v = "notEqual";
+							tmp = "notEqual";
 							break;
 						case 7:
-							v = "greaterThan";
+							tmp = "greaterThan";
 							break;
 						case 8:
-							v = "greaterThanEqual";
+							tmp = "greaterThanEqual";
 							break;
 						case 9:
-							v = "lessThan";
+							tmp = "lessThan";
 							break;
 						case 10:
-							v = "lessThanEqual";
+							tmp = "lessThanEqual";
 							break;
 						default:
 							throw haxe_Exception.thrown("assert");
 						}
-						this.buf.b += Std.string(v);
-						this.buf.b += "(";
+						this.add(tmp);
+						this.add("(");
 						this.addValue(_g5,tabs);
-						this.buf.b += ",";
+						this.add(",");
 						this.addValue(_g4,tabs);
-						this.buf.b += "))";
+						this.add("))");
 					} else {
 						this.addValue(_g5,tabs);
-						this.buf.b += " ";
-						this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-						this.buf.b += " ";
+						this.add(" ");
+						this.add(hxsl_Printer.opStr(_g6));
+						this.add(" ");
 						this.addValue(_g4,tabs);
 					}
 				} else {
 					this.addValue(_g5,tabs);
-					this.buf.b += " ";
-					this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-					this.buf.b += " ";
+					this.add(" ");
+					this.add(hxsl_Printer.opStr(_g6));
+					this.add(" ");
 					this.addValue(_g4,tabs);
 				}
 				break;
 			case 8:
 				if(_g8._hx_index == 5) {
 					if(_g7._hx_index == 5) {
-						this.buf.b += Std.string("vec" + _g8.size + "(");
-						let v;
+						this.add("vec" + _g8.size + "(");
+						let tmp;
 						switch(_g6._hx_index) {
 						case 5:
-							v = "equal";
+							tmp = "equal";
 							break;
 						case 6:
-							v = "notEqual";
+							tmp = "notEqual";
 							break;
 						case 7:
-							v = "greaterThan";
+							tmp = "greaterThan";
 							break;
 						case 8:
-							v = "greaterThanEqual";
+							tmp = "greaterThanEqual";
 							break;
 						case 9:
-							v = "lessThan";
+							tmp = "lessThan";
 							break;
 						case 10:
-							v = "lessThanEqual";
+							tmp = "lessThanEqual";
 							break;
 						default:
 							throw haxe_Exception.thrown("assert");
 						}
-						this.buf.b += Std.string(v);
-						this.buf.b += "(";
+						this.add(tmp);
+						this.add("(");
 						this.addValue(_g5,tabs);
-						this.buf.b += ",";
+						this.add(",");
 						this.addValue(_g4,tabs);
-						this.buf.b += "))";
+						this.add("))");
 					} else {
 						this.addValue(_g5,tabs);
-						this.buf.b += " ";
-						this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-						this.buf.b += " ";
+						this.add(" ");
+						this.add(hxsl_Printer.opStr(_g6));
+						this.add(" ");
 						this.addValue(_g4,tabs);
 					}
 				} else {
 					this.addValue(_g5,tabs);
-					this.buf.b += " ";
-					this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-					this.buf.b += " ";
+					this.add(" ");
+					this.add(hxsl_Printer.opStr(_g6));
+					this.add(" ");
 					this.addValue(_g4,tabs);
 				}
 				break;
 			case 9:
 				if(_g8._hx_index == 5) {
 					if(_g7._hx_index == 5) {
-						this.buf.b += Std.string("vec" + _g8.size + "(");
-						let v;
+						this.add("vec" + _g8.size + "(");
+						let tmp;
 						switch(_g6._hx_index) {
 						case 5:
-							v = "equal";
+							tmp = "equal";
 							break;
 						case 6:
-							v = "notEqual";
+							tmp = "notEqual";
 							break;
 						case 7:
-							v = "greaterThan";
+							tmp = "greaterThan";
 							break;
 						case 8:
-							v = "greaterThanEqual";
+							tmp = "greaterThanEqual";
 							break;
 						case 9:
-							v = "lessThan";
+							tmp = "lessThan";
 							break;
 						case 10:
-							v = "lessThanEqual";
+							tmp = "lessThanEqual";
 							break;
 						default:
 							throw haxe_Exception.thrown("assert");
 						}
-						this.buf.b += Std.string(v);
-						this.buf.b += "(";
+						this.add(tmp);
+						this.add("(");
 						this.addValue(_g5,tabs);
-						this.buf.b += ",";
+						this.add(",");
 						this.addValue(_g4,tabs);
-						this.buf.b += "))";
+						this.add("))");
 					} else {
 						this.addValue(_g5,tabs);
-						this.buf.b += " ";
-						this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-						this.buf.b += " ";
+						this.add(" ");
+						this.add(hxsl_Printer.opStr(_g6));
+						this.add(" ");
 						this.addValue(_g4,tabs);
 					}
 				} else {
 					this.addValue(_g5,tabs);
-					this.buf.b += " ";
-					this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-					this.buf.b += " ";
+					this.add(" ");
+					this.add(hxsl_Printer.opStr(_g6));
+					this.add(" ");
 					this.addValue(_g4,tabs);
 				}
 				break;
 			case 10:
 				if(_g8._hx_index == 5) {
 					if(_g7._hx_index == 5) {
-						this.buf.b += Std.string("vec" + _g8.size + "(");
-						let v;
+						this.add("vec" + _g8.size + "(");
+						let tmp;
 						switch(_g6._hx_index) {
 						case 5:
-							v = "equal";
+							tmp = "equal";
 							break;
 						case 6:
-							v = "notEqual";
+							tmp = "notEqual";
 							break;
 						case 7:
-							v = "greaterThan";
+							tmp = "greaterThan";
 							break;
 						case 8:
-							v = "greaterThanEqual";
+							tmp = "greaterThanEqual";
 							break;
 						case 9:
-							v = "lessThan";
+							tmp = "lessThan";
 							break;
 						case 10:
-							v = "lessThanEqual";
+							tmp = "lessThanEqual";
 							break;
 						default:
 							throw haxe_Exception.thrown("assert");
 						}
-						this.buf.b += Std.string(v);
-						this.buf.b += "(";
+						this.add(tmp);
+						this.add("(");
 						this.addValue(_g5,tabs);
-						this.buf.b += ",";
+						this.add(",");
 						this.addValue(_g4,tabs);
-						this.buf.b += "))";
+						this.add("))");
 					} else {
 						this.addValue(_g5,tabs);
-						this.buf.b += " ";
-						this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-						this.buf.b += " ";
+						this.add(" ");
+						this.add(hxsl_Printer.opStr(_g6));
+						this.add(" ");
 						this.addValue(_g4,tabs);
 					}
 				} else {
 					this.addValue(_g5,tabs);
-					this.buf.b += " ";
-					this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-					this.buf.b += " ";
+					this.add(" ");
+					this.add(hxsl_Printer.opStr(_g6));
+					this.add(" ");
 					this.addValue(_g4,tabs);
 				}
 				break;
 			case 18:
 				this.decl("int _ushr( int i, int j ) { return int(uint(i) >> uint(j)); }");
-				this.buf.b += "_ushr(";
+				this.add("_ushr(");
 				this.addValue(_g5,tabs);
-				this.buf.b += ",";
+				this.add(",");
 				this.addValue(_g4,tabs);
-				this.buf.b += ")";
+				this.add(")");
 				break;
 			case 19:
 				if(e.t != hxsl_Type.TInt) {
 					if(_g6._hx_index == 20) {
 						this.addValue(_g5,tabs);
-						this.buf.b += " = ";
+						this.add(" = ");
 					}
 					this.addExpr({ e : hxsl_TExprDef.TCall({ e : hxsl_TExprDef.TGlobal(hxsl_TGlobal.Mod), t : hxsl_Type.TFun([]), p : e.p},[_g5,_g4]), t : e.t, p : e.p},tabs);
 				} else {
 					this.addValue(_g5,tabs);
-					this.buf.b += " ";
-					this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-					this.buf.b += " ";
+					this.add(" ");
+					this.add(hxsl_Printer.opStr(_g6));
+					this.add(" ");
 					this.addValue(_g4,tabs);
 				}
 				break;
@@ -25030,39 +22873,39 @@ class hxsl_GlslOut {
 									this.decl("vec3 m3x4mult( vec3 v, _mat3x4 m) { vec4 ve = vec4(v,1.0); return vec3(dot(m.a,ve),dot(m.b,ve),dot(m.c,ve)); }");
 									if(_g6._hx_index == 20) {
 										this.addValue(_g5,tabs);
-										this.buf.b += " = ";
+										this.add(" = ");
 									}
-									this.buf.b += "m3x4mult(";
+									this.add("m3x4mult(");
 									this.addValue(_g5,tabs);
-									this.buf.b += ",";
+									this.add(",");
 									this.addValue(_g4,tabs);
-									this.buf.b += ")";
+									this.add(")");
 								} else {
 									this.addValue(_g5,tabs);
-									this.buf.b += " ";
-									this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-									this.buf.b += " ";
+									this.add(" ");
+									this.add(hxsl_Printer.opStr(_g6));
+									this.add(" ");
 									this.addValue(_g4,tabs);
 								}
 							} else {
 								this.addValue(_g5,tabs);
-								this.buf.b += " ";
-								this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-								this.buf.b += " ";
+								this.add(" ");
+								this.add(hxsl_Printer.opStr(_g6));
+								this.add(" ");
 								this.addValue(_g4,tabs);
 							}
 						} else {
 							this.addValue(_g5,tabs);
-							this.buf.b += " ";
-							this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-							this.buf.b += " ";
+							this.add(" ");
+							this.add(hxsl_Printer.opStr(_g6));
+							this.add(" ");
 							this.addValue(_g4,tabs);
 						}
 					} else {
 						this.addValue(_g5,tabs);
-						this.buf.b += " ";
-						this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-						this.buf.b += " ";
+						this.add(" ");
+						this.add(hxsl_Printer.opStr(_g6));
+						this.add(" ");
 						this.addValue(_g4,tabs);
 					}
 					break;
@@ -25070,37 +22913,35 @@ class hxsl_GlslOut {
 					if(e.t != hxsl_Type.TInt) {
 						if(_g6._hx_index == 20) {
 							this.addValue(_g5,tabs);
-							this.buf.b += " = ";
+							this.add(" = ");
 						}
 						this.addExpr({ e : hxsl_TExprDef.TCall({ e : hxsl_TExprDef.TGlobal(hxsl_TGlobal.Mod), t : hxsl_Type.TFun([]), p : e.p},[_g5,_g4]), t : e.t, p : e.p},tabs);
 					} else {
 						this.addValue(_g5,tabs);
-						this.buf.b += " ";
-						this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-						this.buf.b += " ";
+						this.add(" ");
+						this.add(hxsl_Printer.opStr(_g6));
+						this.add(" ");
 						this.addValue(_g4,tabs);
 					}
 					break;
 				default:
 					this.addValue(_g5,tabs);
-					this.buf.b += " ";
-					this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-					this.buf.b += " ";
+					this.add(" ");
+					this.add(hxsl_Printer.opStr(_g6));
+					this.add(" ");
 					this.addValue(_g4,tabs);
 				}
 				break;
 			default:
 				this.addValue(_g5,tabs);
-				this.buf.b += " ";
-				this.buf.b += Std.string(hxsl_Printer.opStr(_g6));
-				this.buf.b += " ";
+				this.add(" ");
+				this.add(hxsl_Printer.opStr(_g6));
+				this.add(" ");
 				this.addValue(_g4,tabs);
 			}
 			break;
 		case 6:
 			let _g9 = _g.e1;
-			let _this = this.buf;
-			let _this1 = _this.b;
 			let tmp;
 			switch(_g.op._hx_index) {
 			case 0:
@@ -25119,20 +22960,19 @@ class hxsl_GlslOut {
 				tmp = "~";
 				break;
 			}
-			_this.b = _this1 + Std.string(tmp);
+			this.add(tmp);
 			this.addValue(_g9,tabs);
 			break;
 		case 7:
 			let _g10 = _g.init;
 			let _g11 = _g.v;
-			this.locals.h[_g11.id] = _g11;
+			this.locals.set(_g11.id,_g11);
 			if(_g10 != null) {
-				let v = this.varName(_g11);
-				this.buf.b += Std.string(v);
-				this.buf.b += " = ";
+				this.ident(_g11);
+				this.add(" = ");
 				this.addValue(_g10,tabs);
 			} else {
-				this.buf.b += "/*var*/";
+				this.add("/*var*/");
 			}
 			break;
 		case 8:
@@ -25143,33 +22983,31 @@ class hxsl_GlslOut {
 				let _g = _g14.g;
 				switch(_g._hx_index) {
 				case 35:
-					let v = this.getFunName(_g,_g12,e.t);
-					this.buf.b += Std.string(v);
-					this.buf.b += "(";
+					this.add(this.getFunName(_g,_g12,e.t));
+					this.add("(");
 					let _g1 = 0;
 					while(_g1 < _g12.length) {
 						let e = _g12[_g1];
 						++_g1;
 						this.addValue(e,tabs);
-						this.buf.b += ", ";
+						this.add(", ");
 					}
-					this.buf.b += "0)";
+					this.add("0)");
 					break;
 				case 53:
 					if(_g12.length == 1) {
 						let _g = _g12[0];
-						this.buf.b += "clamp(";
+						this.add("clamp(");
 						this.addValue(_g,tabs);
-						this.buf.b += ", 0., 1.)";
+						this.add(", 0., 1.)");
 					} else {
 						let _g = _g13.e;
 						if(_g._hx_index == 2) {
-							let v = this.getFunName(_g.g,_g12,e.t);
-							this.buf.b += Std.string(v);
+							this.add(this.getFunName(_g.g,_g12,e.t));
 						} else {
 							this.addValue(_g13,tabs);
 						}
-						this.buf.b += "(";
+						this.add("(");
 						let first = true;
 						let _g1 = 0;
 						while(_g1 < _g12.length) {
@@ -25178,22 +23016,21 @@ class hxsl_GlslOut {
 							if(first) {
 								first = false;
 							} else {
-								this.buf.b += ", ";
+								this.add(", ");
 							}
 							this.addValue(e,tabs);
 						}
-						this.buf.b += ")";
+						this.add(")");
 					}
 					break;
 				default:
 					let _g2 = _g13.e;
 					if(_g2._hx_index == 2) {
-						let v = this.getFunName(_g2.g,_g12,e.t);
-						this.buf.b += Std.string(v);
+						this.add(this.getFunName(_g2.g,_g12,e.t));
 					} else {
 						this.addValue(_g13,tabs);
 					}
-					this.buf.b += "(";
+					this.add("(");
 					let first = true;
 					let _g3 = 0;
 					while(_g3 < _g12.length) {
@@ -25202,21 +23039,20 @@ class hxsl_GlslOut {
 						if(first) {
 							first = false;
 						} else {
-							this.buf.b += ", ";
+							this.add(", ");
 						}
 						this.addValue(e,tabs);
 					}
-					this.buf.b += ")";
+					this.add(")");
 				}
 			} else {
 				let _g = _g13.e;
 				if(_g._hx_index == 2) {
-					let v = this.getFunName(_g.g,_g12,e.t);
-					this.buf.b += Std.string(v);
+					this.add(this.getFunName(_g.g,_g12,e.t));
 				} else {
 					this.addValue(_g13,tabs);
 				}
-				this.buf.b += "(";
+				this.add("(");
 				let first = true;
 				let _g1 = 0;
 				while(_g1 < _g12.length) {
@@ -25225,11 +23061,11 @@ class hxsl_GlslOut {
 					if(first) {
 						first = false;
 					} else {
-						this.buf.b += ", ";
+						this.add(", ");
 					}
 					this.addValue(e,tabs);
 				}
-				this.buf.b += ")";
+				this.add(")");
 			}
 			break;
 		case 9:
@@ -25250,34 +23086,32 @@ class hxsl_GlslOut {
 					break;
 				case 2:
 					this.decl("vec2 _vec2( float v ) { return vec2(v,v); }");
-					this.buf.b += "_vec2(";
+					this.add("_vec2(");
 					this.addValue(_g16,tabs);
-					this.buf.b += ")";
+					this.add(")");
 					break;
 				case 3:
 					this.decl("vec3 _vec3( float v ) { return vec3(v,v,v); }");
-					this.buf.b += "_vec3(";
+					this.add("_vec3(");
 					this.addValue(_g16,tabs);
-					this.buf.b += ")";
+					this.add(")");
 					break;
 				case 4:
 					this.decl("vec4 _vec4( float v ) { return vec4(v,v,v,v); }");
-					this.buf.b += "_vec4(";
+					this.add("_vec4(");
 					this.addValue(_g16,tabs);
-					this.buf.b += ")";
+					this.add(")");
 					break;
 				default:
 					throw haxe_Exception.thrown("assert");
 				}
 			} else {
 				this.addValue(_g16,tabs);
-				this.buf.b += ".";
+				this.add(".");
 				let _g = 0;
 				while(_g < _g15.length) {
 					let r = _g15[_g];
 					++_g;
-					let _this = this.buf;
-					let _this1 = _this.b;
 					let tmp;
 					switch(r._hx_index) {
 					case 0:
@@ -25293,49 +23127,49 @@ class hxsl_GlslOut {
 						tmp = "w";
 						break;
 					}
-					_this.b = _this1 + Std.string(tmp);
+					this.add(tmp);
 				}
 			}
 			break;
 		case 10:
 			let _g17 = _g.eelse;
 			let _g18 = _g.eif;
-			this.buf.b += "if( ";
+			this.add("if( ");
 			this.addValue(_g.econd,tabs);
-			this.buf.b += ") ";
+			this.add(") ");
 			this.addExpr(_g18,tabs);
 			if(_g17 != null) {
 				if(!this.isBlock(_g18)) {
-					this.buf.b += ";";
+					this.add(";");
 				}
-				this.buf.b += " else ";
+				this.add(" else ");
 				this.addExpr(_g17,tabs);
 			}
 			break;
 		case 11:
-			this.buf.b += "discard";
+			this.add("discard");
 			break;
 		case 12:
 			let _g19 = _g.e;
 			if(_g19 == null) {
-				this.buf.b += "return";
+				this.add("return");
 			} else {
-				this.buf.b += "return ";
+				this.add("return ");
 				this.addValue(_g19,tabs);
 			}
 			break;
 		case 13:
 			let _g20 = _g.v;
-			this.locals.h[_g20.id] = _g20;
+			this.locals.set(_g20.id,_g20);
 			let _g21 = _g.it.e;
 			if(_g21._hx_index == 5) {
 				if(_g21.op._hx_index == 21) {
-					this.buf.b += "for(";
-					this.buf.b += Std.string(_g20.name + "=");
+					this.add("for(");
+					this.add(_g20.name + "=");
 					this.addValue(_g21.e1,tabs);
-					this.buf.b += Std.string(";" + _g20.name + "<");
+					this.add(";" + _g20.name + "<");
 					this.addValue(_g21.e2,tabs);
-					this.buf.b += Std.string(";" + _g20.name + "++) ");
+					this.add(";" + _g20.name + "++) ");
 					this.addBlock(_g.loop,tabs);
 				} else {
 					throw haxe_Exception.thrown("assert");
@@ -25345,16 +23179,16 @@ class hxsl_GlslOut {
 			}
 			break;
 		case 14:
-			this.buf.b += "continue";
+			this.add("continue");
 			break;
 		case 15:
-			this.buf.b += "break";
+			this.add("break");
 			break;
 		case 16:
 			this.addValue(_g.e,tabs);
-			this.buf.b += "[";
+			this.add("[");
 			this.addValue(_g.index,tabs);
-			this.buf.b += "]";
+			this.add("]");
 			break;
 		case 17:
 			let _g22 = _g.el;
@@ -25364,8 +23198,8 @@ class hxsl_GlslOut {
 			} else {
 				throw haxe_Exception.thrown("assert");
 			}
-			this.buf.b += Std.string("[" + _g22.length + "]");
-			this.buf.b += "(";
+			this.add("[" + _g22.length + "]");
+			this.add("(");
 			let first = true;
 			let _g24 = 0;
 			while(_g24 < _g22.length) {
@@ -25374,29 +23208,29 @@ class hxsl_GlslOut {
 				if(first) {
 					first = false;
 				} else {
-					this.buf.b += ", ";
+					this.add(", ");
 				}
 				this.addValue(e,tabs);
 			}
-			this.buf.b += ")";
+			this.add(")");
 			break;
 		case 18:
-			this.buf.b += "switch(...)";
+			this.add("switch(...)");
 			break;
 		case 19:
 			let _g25 = _g.loop;
 			let _g26 = _g.e;
 			if(_g.normalWhile == false) {
 				tabs += "\t";
-				this.buf.b += "do ";
+				this.add("do ");
 				this.addBlock(_g25,tabs);
-				this.buf.b += " while( ";
+				this.add(" while( ");
 				this.addValue(_g26,tabs);
-				this.buf.b += " )";
+				this.add(" )");
 			} else {
-				this.buf.b += "while( ";
+				this.add("while( ");
 				this.addValue(_g26,tabs);
-				this.buf.b += " ) ";
+				this.add(" ) ");
 				this.addBlock(_g25,tabs);
 			}
 			break;
@@ -25410,36 +23244,36 @@ class hxsl_GlslOut {
 			if(this.isVertex) {
 				return "gl_Position";
 			}
-			if(this.glES != null && this.glES <= 2) {
+			if(this.get_isES2()) {
 				if(this.outIndexes == null) {
 					return "gl_FragColor";
 				}
-				return "gl_FragData[" + this.outIndexes.h[v.id] + "]";
+				return "gl_FragData[" + this.outIndexes.get(v.id) + "]";
 			}
 		}
-		let n = this.varNames.h[v.id];
+		let n = this.varNames.get(v.id);
 		if(n != null) {
 			return n;
 		}
 		n = v.name;
-		if(Object.prototype.hasOwnProperty.call(hxsl_GlslOut.KWDS.h,n)) {
+		if(hxsl_GlslOut.KWDS.exists(n)) {
 			n = "_" + n;
 		}
-		if(Object.prototype.hasOwnProperty.call(this.allNames.h,n)) {
+		if(this.allNames.exists(n)) {
 			let k = 2;
 			n += "_";
-			while(Object.prototype.hasOwnProperty.call(this.allNames.h,n + k)) ++k;
+			while(this.allNames.exists(n + k)) ++k;
 			n += k;
 		}
-		this.varNames.h[v.id] = n;
-		this.allNames.h[n] = v.id;
+		this.varNames.set(v.id,n);
+		this.allNames.set(n,v.id);
 		return n;
 	}
 	newLine(e) {
 		if(this.isBlock(e)) {
-			this.buf.b += "\n";
+			this.add("\n");
 		} else {
-			this.buf.b += ";\n";
+			this.add(";\n");
 		}
 	}
 	isBlock(e) {
@@ -25464,30 +23298,30 @@ class hxsl_GlslOut {
 		switch(v.kind._hx_index) {
 		case 0:case 2:
 			if(v.type._hx_index == 16) {
-				this.buf.b += "layout(std140) ";
+				this.add("layout(std140) ");
 			}
-			this.buf.b += "uniform ";
+			this.add("uniform ");
 			break;
 		case 1:
-			this.buf.b += Std.string(this.glES != null && this.glES <= 2 ? "attribute " : "in ");
+			this.add(this.get_isES2() ? "attribute " : "in ");
 			break;
 		case 3:
-			this.buf.b += Std.string(this.glES != null && this.glES <= 2 ? "varying " : this.isVertex ? "out " : "in ");
+			this.add(this.get_isES2() ? "varying " : this.isVertex ? "out " : "in ");
 			break;
 		case 4:
 			break;
 		case 5:
-			if(this.glES != null && this.glES <= 2) {
-				this.outIndexes.h[v.id] = this.outIndex++;
+			if(this.get_isES2()) {
+				this.outIndexes.set(v.id,this.outIndex++);
 				return;
 			}
 			if(this.isVertex) {
 				return;
 			}
-			if(this.glES != null) {
-				this.buf.b += Std.string("layout(location=" + this.outIndex++ + ") ");
+			if(this.get_isES()) {
+				this.add("layout(location=" + this.outIndex++ + ") ");
 			}
-			this.buf.b += "out ";
+			this.add("out ");
 			break;
 		case 6:
 			return;
@@ -25501,20 +23335,20 @@ class hxsl_GlslOut {
 				if(q._hx_index == 6) {
 					switch(q.p._hx_index) {
 					case 0:
-						this.buf.b += "lowp ";
+						this.add("lowp ");
 						break;
 					case 1:
-						this.buf.b += "mediump ";
+						this.add("mediump ");
 						break;
 					case 2:
-						this.buf.b += "highp ";
+						this.add("highp ");
 						break;
 					}
 				}
 			}
 		}
 		this.addVar(v);
-		this.buf.b += ";\n";
+		this.add(";\n");
 	}
 	initVars(s) {
 		this.outIndex = 0;
@@ -25527,10 +23361,10 @@ class hxsl_GlslOut {
 			++_g;
 			this.initVar(v);
 		}
-		this.buf.b += "\n";
+		this.add("\n");
 		if(this.outIndex < 2) {
 			this.outIndexes = null;
-		} else if(!this.isVertex && (this.glES != null && this.glES <= 2)) {
+		} else if(!this.isVertex && this.get_isES2()) {
 			this.decl("#extension GL_EXT_draw_buffers : enable");
 		}
 	}
@@ -25548,7 +23382,7 @@ class hxsl_GlslOut {
 		this.initVars(s);
 		let tmp = this.buf;
 		this.buf = new StringBuf();
-		this.buf.b += "void main(void) {\n";
+		this.add("void main(void) {\n");
 		let _g = f.expr.e;
 		if(_g._hx_index == 4) {
 			let _g1 = _g.el;
@@ -25556,15 +23390,15 @@ class hxsl_GlslOut {
 			while(_g2 < _g1.length) {
 				let e = _g1[_g2];
 				++_g2;
-				this.buf.b += "\t";
+				this.add("\t");
 				this.addExpr(e,"\t");
 				this.newLine(e);
 			}
 		} else {
 			this.addExpr(f.expr,"");
 		}
-		this.buf.b += "}";
-		this.exprValues.push(this.buf.b);
+		this.add("}");
+		this.exprValues.push(this.buf.toString());
 		this.buf = tmp;
 		let locals = Lambda.array(this.locals);
 		locals.sort(function(v1,v2) {
@@ -25575,25 +23409,25 @@ class hxsl_GlslOut {
 			let v = locals[_g1];
 			++_g1;
 			this.addVar(v);
-			this.buf.b += ";\n";
+			this.add(";\n");
 		}
-		this.buf.b += "\n";
+		this.add("\n");
 		let _g2 = 0;
 		let _g3 = this.exprValues;
 		while(_g2 < _g3.length) {
 			let e = _g3[_g2];
 			++_g2;
-			this.buf.b += Std.string(e);
-			this.buf.b += "\n\n";
+			this.add(e);
+			this.add("\n\n");
 		}
-		if(this.glES != null) {
+		if(this.get_isES()) {
 			this.decl("#version " + (this.version < 100 ? 100 : this.version) + (this.version > 150 ? " es" : ""));
 		} else if(this.version != null) {
 			this.decl("#version " + (this.version > 150 ? 150 : this.version));
 		} else {
 			this.decl("#version 130");
 		}
-		this.decls.push(this.buf.b);
+		this.decls.push(this.buf.toString());
 		this.buf = null;
 		return this.decls.join("\n");
 	}
@@ -25632,6 +23466,8 @@ class hxsl_Linker {
 		}
 		this.debugDepth = 0;
 		this.batchMode = batchMode;
+	}
+	debug(msg,pos) {
 	}
 	error(msg,p) {
 		return hxsl_Error.t(msg,p);
@@ -25702,7 +23538,7 @@ class hxsl_Linker {
 				}
 			}
 		}
-		let v2 = this.varMap.h[key];
+		let v2 = this.varMap.get(key);
 		let vname = v.name;
 		if(v2 != null) {
 			let _g = 0;
@@ -25724,7 +23560,7 @@ class hxsl_Linker {
 			if(tmp || v.kind == hxsl_VarKind.Param && v2.v.kind == hxsl_VarKind.Param) {
 				let k = 2;
 				while(true) {
-					let a = this.varMap.h[key + k];
+					let a = this.varMap.get(key + k);
 					if(a == null) {
 						break;
 					}
@@ -25744,7 +23580,7 @@ class hxsl_Linker {
 			} else {
 				v2.merged.push(v);
 				this.mergeVar(key,v,v2.v,p);
-				this.varIdMap.h[v.id] = v2.id;
+				this.varIdMap.set(v.id,v2.id);
 				return v2;
 			}
 		}
@@ -25758,7 +23594,7 @@ class hxsl_Linker {
 		a.parent = parent;
 		a.instanceIndex = this.curInstance;
 		this.allVars.push(a);
-		this.varMap.h[key] = a;
+		this.varMap.set(key,a);
 		let _g = v21.type;
 		if(_g._hx_index == 13) {
 			let _g1 = _g.vl;
@@ -25778,11 +23614,13 @@ class hxsl_Linker {
 		switch(_g._hx_index) {
 		case 1:
 			let _g1 = _g.v;
-			if(!this.locals.h.hasOwnProperty(_g1.id)) {
+			if(!this.locals.exists(_g1.id)) {
 				let v = this.allocVar(_g1,e.p);
-				if(this.curShader != null && !this.curShader.write.h.hasOwnProperty(v.id)) {
-					this.curShader.read.h[v.id] = v;
+				if(this.curShader != null && !this.curShader.write.exists(v.id)) {
+					this.debug(this.curShader.name + " read " + v.path,{ fileName : "hxsl/Linker.hx", lineNumber : 179, className : "hxsl.Linker", methodName : "mapExprVar"});
+					this.curShader.read.set(v.id,v);
 					if(this.curShader.vertex == null && v.v.kind == hxsl_VarKind.Var) {
+						this.debug("Force " + this.curShader.name + " into fragment (use varying)",{ fileName : "hxsl/Linker.hx", lineNumber : 183, className : "hxsl.Linker", methodName : "mapExprVar"});
 						this.curShader.vertex = false;
 					}
 				}
@@ -25799,19 +23637,21 @@ class hxsl_Linker {
 				switch(_g5._hx_index) {
 				case 1:
 					let _g6 = _g5.v;
-					if(!this.locals.h.hasOwnProperty(_g6.id)) {
+					if(!this.locals.exists(_g6.id)) {
 						let e2 = this.mapExprVar(_g2);
 						let v = this.allocVar(_g6,_g3.p);
 						if(this.curShader != null) {
-							this.curShader.write.h[v.id] = v;
+							this.debug(this.curShader.name + " write " + v.path,{ fileName : "hxsl/Linker.hx", lineNumber : 194, className : "hxsl.Linker", methodName : "mapExprVar"});
+							this.curShader.write.set(v.id,v);
 						}
 						return { e : hxsl_TExprDef.TBinop(_g4,{ e : hxsl_TExprDef.TVar(v.v), t : v.v.type, p : e.p},e2), t : e.t, p : e.p};
-					} else if(!this.locals.h.hasOwnProperty(_g6.id)) {
+					} else if(!this.locals.exists(_g6.id)) {
 						let e1 = this.mapExprVar(_g3);
 						let e2 = this.mapExprVar(_g2);
 						let v = this.allocVar(_g6,e1.p);
 						if(this.curShader != null) {
-							this.curShader.write.h[v.id] = v;
+							this.debug(this.curShader.name + " write " + v.path,{ fileName : "hxsl/Linker.hx", lineNumber : 207, className : "hxsl.Linker", methodName : "mapExprVar"});
+							this.curShader.write.set(v.id,v);
 						}
 						return { e : hxsl_TExprDef.TBinop(_g4,e1,e2), t : e.t, p : e.p};
 					}
@@ -25820,12 +23660,13 @@ class hxsl_Linker {
 					let _g7 = _g5.e.e;
 					if(_g7._hx_index == 1) {
 						let _g = _g7.v;
-						if(!this.locals.h.hasOwnProperty(_g.id)) {
+						if(!this.locals.exists(_g.id)) {
 							let e1 = this.mapExprVar(_g3);
 							let e2 = this.mapExprVar(_g2);
 							let v = this.allocVar(_g,e1.p);
 							if(this.curShader != null) {
-								this.curShader.write.h[v.id] = v;
+								this.debug(this.curShader.name + " write " + v.path,{ fileName : "hxsl/Linker.hx", lineNumber : 207, className : "hxsl.Linker", methodName : "mapExprVar"});
+								this.curShader.write.set(v.id,v);
 							}
 							return { e : hxsl_TExprDef.TBinop(_g4,e1,e2), t : e.t, p : e.p};
 						}
@@ -25838,12 +23679,13 @@ class hxsl_Linker {
 				switch(_g5._hx_index) {
 				case 1:
 					let _g8 = _g5.v;
-					if(!this.locals.h.hasOwnProperty(_g8.id)) {
+					if(!this.locals.exists(_g8.id)) {
 						let e1 = this.mapExprVar(_g3);
 						let e2 = this.mapExprVar(_g2);
 						let v = this.allocVar(_g8,e1.p);
 						if(this.curShader != null) {
-							this.curShader.write.h[v.id] = v;
+							this.debug(this.curShader.name + " write " + v.path,{ fileName : "hxsl/Linker.hx", lineNumber : 207, className : "hxsl.Linker", methodName : "mapExprVar"});
+							this.curShader.write.set(v.id,v);
 						}
 						return { e : hxsl_TExprDef.TBinop(_g4,e1,e2), t : e.t, p : e.p};
 					}
@@ -25852,12 +23694,13 @@ class hxsl_Linker {
 					let _g9 = _g5.e.e;
 					if(_g9._hx_index == 1) {
 						let _g = _g9.v;
-						if(!this.locals.h.hasOwnProperty(_g.id)) {
+						if(!this.locals.exists(_g.id)) {
 							let e1 = this.mapExprVar(_g3);
 							let e2 = this.mapExprVar(_g2);
 							let v = this.allocVar(_g,e1.p);
 							if(this.curShader != null) {
-								this.curShader.write.h[v.id] = v;
+								this.debug(this.curShader.name + " write " + v.path,{ fileName : "hxsl/Linker.hx", lineNumber : 207, className : "hxsl.Linker", methodName : "mapExprVar"});
+								this.curShader.write.set(v.id,v);
 							}
 							return { e : hxsl_TExprDef.TBinop(_g4,e1,e2), t : e.t, p : e.p};
 						}
@@ -25870,7 +23713,7 @@ class hxsl_Linker {
 			}
 			break;
 		case 7:
-			this.locals.h[_g.v.id] = true;
+			this.locals.set(_g.v.id,true);
 			break;
 		case 11:
 			if(this.curShader != null) {
@@ -25879,7 +23722,7 @@ class hxsl_Linker {
 			}
 			break;
 		case 13:
-			this.locals.h[_g.v.id] = true;
+			this.locals.set(_g.v.id,true);
 			break;
 		default:
 		}
@@ -25892,6 +23735,7 @@ class hxsl_Linker {
 		s.body = this.mapExprVar(e);
 		this.shaders.push(s);
 		this.curShader = null;
+		this.debug("Adding shader " + name + " with priority " + p,{ fileName : "hxsl/Linker.hx", lineNumber : 234, className : "hxsl.Linker", methodName : "addShader"});
 		return s;
 	}
 	sortByPriorityDesc(s1,s2) {
@@ -25913,7 +23757,7 @@ class hxsl_Linker {
 			} else if(!found) {
 				continue;
 			}
-			if(!parent.write.h.hasOwnProperty(v.id)) {
+			if(!parent.write.exists(v.id)) {
 				continue;
 			}
 			if(s.vertex) {
@@ -25924,11 +23768,12 @@ class hxsl_Linker {
 					parent.vertex = true;
 				}
 			}
+			this.debug(s.name + " => " + parent.name + " (" + v.path + ")",{ fileName : "hxsl/Linker.hx", lineNumber : 260, className : "hxsl.Linker", methodName : "buildDependency"});
 			s.deps.set(parent,true);
 			this.debugDepth++;
 			this.initDependencies(parent);
 			this.debugDepth--;
-			if(!parent.read.h.hasOwnProperty(v.id)) {
+			if(!parent.read.exists(v.id)) {
 				return;
 			}
 		}
@@ -25944,13 +23789,14 @@ class hxsl_Linker {
 		let r = s.read.iterator();
 		while(r.hasNext()) {
 			let r1 = r.next();
-			this.buildDependency(s,r1,s.write.h.hasOwnProperty(r1.id));
+			this.buildDependency(s,r1,s.write.exists(r1.id));
 		}
 		if(s.vertex == null) {
 			let d = s.deps.keys();
 			while(d.hasNext()) {
 				let d1 = d.next();
 				if(d1.vertex == false) {
+					this.debug(s.name + " marked as fragment because of " + d1.name,{ fileName : "hxsl/Linker.hx", lineNumber : 282, className : "hxsl.Linker", methodName : "initDependencies"});
 					s.vertex = false;
 					break;
 				}
@@ -25961,6 +23807,7 @@ class hxsl_Linker {
 			while(d.hasNext()) {
 				let d1 = d.next();
 				if(d1.vertex == null) {
+					this.debug(d1.name + " marked as vertex because of " + s.name,{ fileName : "hxsl/Linker.hx", lineNumber : 290, className : "hxsl.Linker", methodName : "initDependencies"});
 					d1.vertex = true;
 				}
 			}
@@ -25989,9 +23836,11 @@ class hxsl_Linker {
 			this.collect(d,out,vertex);
 		}
 		if(cur.vertex == null) {
+			this.debug("MARK " + cur.name + " " + (vertex ? "vertex" : "fragment"),{ fileName : "hxsl/Linker.hx", lineNumber : 307, className : "hxsl.Linker", methodName : "collect"});
 			cur.vertex = vertex;
 		}
 		if(cur.vertex == vertex) {
+			this.debug("COLLECT " + cur.name + " " + (vertex ? "vertex" : "fragment"),{ fileName : "hxsl/Linker.hx", lineNumber : 311, className : "hxsl.Linker", methodName : "collect"});
 			out.push(cur);
 		}
 		cur.onStack = false;
@@ -26002,10 +23851,10 @@ class hxsl_Linker {
 		case 4:
 			let _g1 = _g.el;
 			let _g2 = new haxe_ds_StringMap();
-			let k = haxe_ds_StringMap.keysIterator(locals.h);
+			let k = locals.keys();
 			while(k.hasNext()) {
 				let k1 = k.next();
-				_g2.h[k1] = true;
+				_g2.set(k1,true);
 			}
 			let _g3 = 0;
 			while(_g3 < _g1.length) {
@@ -26016,12 +23865,12 @@ class hxsl_Linker {
 			break;
 		case 7:
 			let _g4 = _g.v;
-			if(Object.prototype.hasOwnProperty.call(locals.h,_g4.name)) {
+			if(locals.exists(_g4.name)) {
 				let k = 2;
-				while(Object.prototype.hasOwnProperty.call(locals.h,_g4.name + k)) ++k;
+				while(locals.exists(_g4.name + k)) ++k;
 				_g4.name += k;
 			}
-			locals.h[_g4.name] = true;
+			locals.set(_g4.name,true);
 			break;
 		default:
 			let _g5 = $bind(this,this.uniqueLocals);
@@ -26032,6 +23881,7 @@ class hxsl_Linker {
 		}
 	}
 	link(shadersData) {
+		this.debug("---------------------- LINKING -----------------------",{ fileName : "hxsl/Linker.hx", lineNumber : 337, className : "hxsl.Linker", methodName : "link"});
 		this.varMap = new haxe_ds_StringMap();
 		this.varIdMap = new haxe_ds_IntMap();
 		this.allVars = [];
@@ -26046,7 +23896,7 @@ class hxsl_Linker {
 			++_g1;
 			let s1 = s;
 			let sreal = s;
-			if(dupShaders.h.__keys__[s.__id__] != null) {
+			if(dupShaders.exists(s)) {
 				s1 = hxsl_Clone.shaderData(s);
 			}
 			dupShaders.set(s1,sreal);
@@ -26176,6 +24026,7 @@ class hxsl_Linker {
 				}
 			}
 			if(onlyParams) {
+				this.debug("Force " + s.name + " into fragment since it only reads params",{ fileName : "hxsl/Linker.hx", lineNumber : 433, className : "hxsl.Linker", methodName : "link"});
 				s.vertex = false;
 			}
 		}
@@ -26208,14 +24059,14 @@ class hxsl_Linker {
 			s.marked = true;
 		}
 		let outVars1 = [];
-		let varMap_h = { };
+		let varMap = new haxe_ds_IntMap();
 		let addVar = null;
 		addVar = function(v) {
 			while(true) {
-				if(varMap_h.hasOwnProperty(v.id)) {
+				if(varMap.exists(v.id)) {
 					return;
 				}
-				varMap_h[v.id] = true;
+				varMap.set(v.id,true);
 				if(v.v.parent != null) {
 					v = v.parent;
 					continue;
@@ -26252,7 +24103,7 @@ class hxsl_Linker {
 					while(_g < _g1.length) {
 						let v = _g1[_g];
 						++_g;
-						if(varMap_h.hasOwnProperty(v.id)) {
+						if(varMap.exists(v.id)) {
 							cleanVar(v);
 							vout.push(v);
 						}
@@ -26296,7 +24147,7 @@ class hxsl_Linker {
 		let s = dupShaders.keys();
 		while(s.hasNext()) {
 			let s1 = s.next();
-			let sreal = dupShaders.h[s1.__id__];
+			let sreal = dupShaders.get(s1);
 			if(s1 == sreal) {
 				continue;
 			}
@@ -26332,6 +24183,9 @@ class hxsl_Printer {
 		}
 		this.varId = varId;
 	}
+	add(v) {
+		this.buffer.add(v);
+	}
 	shaderString(s) {
 		this.buffer = new StringBuf();
 		let _g = 0;
@@ -26340,10 +24194,10 @@ class hxsl_Printer {
 			let v = _g1[_g];
 			++_g;
 			this.addVar(v,hxsl_VarKind.Var);
-			this.buffer.b += ";\n";
+			this.add(";\n");
 		}
 		if(s.vars.length > 0) {
-			this.buffer.b += "\n";
+			this.add("\n");
 		}
 		let _g2 = 0;
 		let _g3 = s.funs;
@@ -26351,14 +24205,14 @@ class hxsl_Printer {
 			let f = _g3[_g2];
 			++_g2;
 			this.addFun(f);
-			this.buffer.b += "\n\n";
+			this.add("\n\n");
 		}
-		return this.buffer.b;
+		return this.buffer.toString();
 	}
 	exprString(e) {
 		this.buffer = new StringBuf();
 		this.addExpr(e,"");
-		return this.buffer.b;
+		return this.buffer.toString();
 	}
 	addVar(v,defKind,tabs,parent) {
 		if(tabs == null) {
@@ -26370,80 +24224,79 @@ class hxsl_Printer {
 			while(_g < _g1.length) {
 				let q = _g1[_g];
 				++_g;
-				let v;
+				let tmp;
 				switch(q._hx_index) {
 				case 0:
 					let _g2 = q.max;
-					v = "const" + (_g2 == null ? "" : "(" + _g2 + ")");
+					tmp = "const" + (_g2 == null ? "" : "(" + _g2 + ")");
 					break;
 				case 1:
-					v = "private";
+					tmp = "private";
 					break;
 				case 2:
-					v = "nullable";
+					tmp = "nullable";
 					break;
 				case 3:
-					v = "perObject";
+					tmp = "perObject";
 					break;
 				case 4:
-					v = "name('" + q.n + "')";
+					tmp = "name('" + q.n + "')";
 					break;
 				case 5:
-					v = "shared";
+					tmp = "shared";
 					break;
 				case 6:
-					let _g3 = q.p;
-					v = $hxEnums[_g3.__enum__].__constructs__[_g3._hx_index].toLowerCase() + "p";
+					tmp = Type.enumConstructor(q.p).toLowerCase() + "p";
 					break;
 				case 7:
-					v = "range(" + q.min + "," + q.max + ")";
+					tmp = "range(" + q.min + "," + q.max + ")";
 					break;
 				case 8:
-					v = "ignore";
+					tmp = "ignore";
 					break;
 				case 9:
-					v = "perInstance(" + q.v + ")";
+					tmp = "perInstance(" + q.v + ")";
 					break;
 				}
-				this.buffer.b += Std.string("@" + v + " ");
+				this.add("@" + tmp + " ");
 			}
 		}
 		if(v.kind != defKind) {
 			switch(v.kind._hx_index) {
 			case 0:
-				this.buffer.b += "@global ";
+				this.add("@global ");
 				break;
 			case 1:
-				this.buffer.b += "@input ";
+				this.add("@input ");
 				break;
 			case 2:
-				this.buffer.b += "@param ";
+				this.add("@param ");
 				break;
 			case 3:
-				this.buffer.b += "@var ";
+				this.add("@var ");
 				break;
 			case 4:
-				this.buffer.b += "@local ";
+				this.add("@local ");
 				break;
 			case 5:
-				this.buffer.b += "@output ";
+				this.add("@output ");
 				break;
 			case 6:
-				this.buffer.b += "@function ";
+				this.add("@function ");
 				break;
 			}
 		}
-		this.buffer.b += "var ";
+		this.add("var ");
 		if(v.parent == parent) {
-			this.buffer.b += Std.string(v.name + (this.varId ? "@" + v.id : ""));
+			this.add(v.name + (this.varId ? "@" + v.id : ""));
 		} else {
 			this.addVarName(v);
 		}
-		this.buffer.b += " : ";
+		this.add(" : ");
 		let _g = v.type;
 		if(_g._hx_index == 13) {
 			let _g1 = _g.vl;
-			this.buffer.b += "{";
+			this.add("{");
 			let first = true;
 			let _g2 = 0;
 			while(_g2 < _g1.length) {
@@ -26452,18 +24305,17 @@ class hxsl_Printer {
 				if(first) {
 					first = false;
 				} else {
-					this.buffer.b += ", ";
+					this.add(", ");
 				}
 				this.addVar(v,v.kind,tabs,v);
 			}
-			this.buffer.b += "}";
+			this.add("}");
 		} else {
-			let v1 = hxsl_Tools.toString(v.type);
-			this.buffer.b += Std.string(v1);
+			this.add(hxsl_Tools.toString(v.type));
 		}
 	}
 	addFun(f) {
-		this.buffer.b += Std.string("function " + f.ref.name + "(");
+		this.add("function " + f.ref.name + "(");
 		let first = true;
 		let _g = 0;
 		let _g1 = f.args;
@@ -26471,33 +24323,30 @@ class hxsl_Printer {
 			let a = _g1[_g];
 			++_g;
 			if(first) {
-				this.buffer.b += " ";
+				this.add(" ");
 				first = false;
 			} else {
-				this.buffer.b += ", ";
+				this.add(", ");
 			}
 			this.addVar(a,hxsl_VarKind.Local);
 		}
 		if(f.args.length > 0) {
-			this.buffer.b += " ";
+			this.add(" ");
 		}
-		let v = ") : " + hxsl_Tools.toString(f.ret) + " ";
-		this.buffer.b += Std.string(v);
+		this.add(") : " + hxsl_Tools.toString(f.ret) + " ");
 		this.addExpr(f.expr,"");
 	}
 	addVarName(v) {
 		if(v.parent != null) {
 			this.addVarName(v.parent);
-			this.buffer.b += ".";
+			this.add(".");
 		}
-		this.buffer.b += Std.string(v.name);
+		this.add(v.name);
 		if(this.varId) {
-			this.buffer.b += Std.string("@" + v.id);
+			this.add("@" + v.id);
 		}
 	}
 	addConst(c) {
-		let _this = this.buffer;
-		let _this1 = _this.b;
 		let tmp;
 		switch(c._hx_index) {
 		case 0:
@@ -26516,7 +24365,7 @@ class hxsl_Printer {
 			tmp = "\"" + c.v + "\"";
 			break;
 		}
-		_this.b = _this1 + Std.string(tmp);
+		this.add(tmp);
 	}
 	addExpr(e,tabs) {
 		let _g = e.e;
@@ -26528,41 +24377,38 @@ class hxsl_Printer {
 			this.addVarName(_g.v);
 			break;
 		case 2:
-			let v = hxsl_Tools2.toString(_g.g);
-			this.buffer.b += Std.string(v);
+			this.add(hxsl_Tools2.toString(_g.g));
 			break;
 		case 3:
-			this.buffer.b += "(";
+			this.add("(");
 			this.addExpr(_g.e,tabs);
-			this.buffer.b += ")";
+			this.add(")");
 			break;
 		case 4:
 			let _g1 = _g.el;
-			this.buffer.b += "{";
+			this.add("{");
 			tabs += "\t";
 			let _g2 = 0;
 			while(_g2 < _g1.length) {
 				let e = _g1[_g2];
 				++_g2;
-				this.buffer.b += Std.string("\n" + tabs);
+				this.add("\n" + tabs);
 				this.addExpr(e,tabs);
-				this.buffer.b += ";";
+				this.add(";");
 			}
 			tabs = HxOverrides.substr(tabs,1,null);
 			if(_g1.length > 0) {
-				this.buffer.b += Std.string("\n" + tabs);
+				this.add("\n" + tabs);
 			}
-			this.buffer.b += "}";
+			this.add("}");
 			break;
 		case 5:
 			this.addExpr(_g.e1,tabs);
-			this.buffer.b += Std.string(" " + hxsl_Printer.opStr(_g.op) + " ");
+			this.add(" " + hxsl_Printer.opStr(_g.op) + " ");
 			this.addExpr(_g.e2,tabs);
 			break;
 		case 6:
 			let _g3 = _g.e1;
-			let _this = this.buffer;
-			let _this1 = _this.b;
 			let tmp;
 			switch(_g.op._hx_index) {
 			case 0:
@@ -26581,21 +24427,21 @@ class hxsl_Printer {
 				tmp = "~";
 				break;
 			}
-			_this.b = _this1 + Std.string(tmp);
+			this.add(tmp);
 			this.addExpr(_g3,tabs);
 			break;
 		case 7:
 			let _g4 = _g.init;
 			this.addVar(_g.v,hxsl_VarKind.Local,tabs);
 			if(_g4 != null) {
-				this.buffer.b += " = ";
+				this.add(" = ");
 				this.addExpr(_g4,tabs);
 			}
 			break;
 		case 8:
 			let _g5 = _g.args;
 			this.addExpr(_g.e,tabs);
-			this.buffer.b += "(";
+			this.add("(");
 			let first = true;
 			let _g6 = 0;
 			while(_g6 < _g5.length) {
@@ -26604,68 +24450,68 @@ class hxsl_Printer {
 				if(first) {
 					first = false;
 				} else {
-					this.buffer.b += ", ";
+					this.add(", ");
 				}
 				this.addExpr(e,tabs);
 			}
-			this.buffer.b += ")";
+			this.add(")");
 			break;
 		case 9:
 			let _g7 = _g.regs;
 			this.addExpr(_g.e,tabs);
-			this.buffer.b += ".";
+			this.add(".");
 			let _g8 = 0;
 			while(_g8 < _g7.length) {
 				let r = _g7[_g8];
 				++_g8;
-				this.buffer.b += Std.string(hxsl_Printer.SWIZ[r._hx_index]);
+				this.add(hxsl_Printer.SWIZ[Type.enumIndex(r)]);
 			}
 			break;
 		case 10:
 			let _g9 = _g.eelse;
-			this.buffer.b += "if( ";
+			this.add("if( ");
 			this.addExpr(_g.econd,tabs);
-			this.buffer.b += " ) ";
+			this.add(" ) ");
 			this.addExpr(_g.eif,tabs);
 			if(_g9 != null) {
-				this.buffer.b += " else ";
+				this.add(" else ");
 				this.addExpr(_g9,tabs);
 			}
 			break;
 		case 11:
-			this.buffer.b += "discard";
+			this.add("discard");
 			break;
 		case 12:
 			let _g10 = _g.e;
-			this.buffer.b += "return";
+			this.add("return");
 			if(_g10 != null) {
-				this.buffer.b += " ";
+				this.add(" ");
 				this.addExpr(_g10,tabs);
 			}
 			break;
 		case 13:
-			this.buffer.b += "for( ";
+			this.add("for( ");
 			this.addVarName(_g.v);
-			this.buffer.b += " in ";
+			this.add(" in ");
 			this.addExpr(_g.it,tabs);
-			this.buffer.b += " ) ";
+			this.add(" ) ");
 			this.addExpr(_g.loop,tabs);
 			break;
 		case 14:
-			this.buffer.b += "continue";
+			this.add("continue");
 			break;
 		case 15:
-			this.buffer.b += "break";
+			this.add("break");
 			break;
 		case 16:
 			this.addExpr(_g.e,tabs);
-			this.buffer.b += "[";
+			this.add("[");
 			this.addExpr(_g.index,tabs);
-			this.buffer.b += "]";
+			this.add("]");
 			break;
 		case 17:
 			let _g11 = _g.el;
-			this.buffer.b += "[";
+			this.add("[");
 			let first1 = true;
 			let _g12 = 0;
 			while(_g12 < _g11.length) {
@@ -26674,25 +24520,25 @@ class hxsl_Printer {
 				if(first1) {
 					first1 = false;
 				} else {
-					this.buffer.b += ", ";
+					this.add(", ");
 				}
 				this.addExpr(e,tabs);
 			}
-			this.buffer.b += "]";
+			this.add("]");
 			break;
 		case 18:
 			let _g13 = _g.def;
 			let _g14 = _g.cases;
-			this.buffer.b += "switch( ";
+			this.add("switch( ");
 			this.addExpr(_g.e,tabs);
-			this.buffer.b += ") {";
+			this.add(") {");
 			let old = tabs;
 			let _g15 = 0;
 			while(_g15 < _g14.length) {
 				let c = _g14[_g15];
 				++_g15;
-				this.buffer.b += Std.string("\n" + tabs);
-				this.buffer.b += "case ";
+				this.add("\n" + tabs);
+				this.add("case ");
 				let first = true;
 				let _g = 0;
 				let _g1 = c.values;
@@ -26702,23 +24548,23 @@ class hxsl_Printer {
 					if(first) {
 						first = false;
 					} else {
-						this.buffer.b += ", ";
+						this.add(", ");
 					}
 					this.addExpr(v,tabs);
 				}
 				tabs += "\t";
-				this.buffer.b += Std.string(":\n" + tabs);
+				this.add(":\n" + tabs);
 				this.addExpr(c.expr,tabs);
 				tabs = old;
 			}
 			if(_g13 != null) {
-				this.buffer.b += Std.string("\n" + tabs);
+				this.add("\n" + tabs);
 				tabs += "\t";
-				this.buffer.b += Std.string("default:\n" + tabs);
+				this.add("default:\n" + tabs);
 				this.addExpr(_g13,tabs);
 				tabs = old;
 			}
-			this.buffer.b += Std.string("\n" + tabs + "}");
+			this.add("\n" + tabs + "}");
 			break;
 		case 19:
 			let _g16 = _g.loop;
@@ -26726,29 +24572,29 @@ class hxsl_Printer {
 			if(_g.normalWhile == false) {
 				let old = tabs;
 				tabs += "\t";
-				this.buffer.b += Std.string("do {\n" + tabs);
+				this.add("do {\n" + tabs);
 				this.addExpr(_g16,tabs);
 				tabs = old;
-				this.buffer.b += Std.string("\n" + old + "} while( ");
+				this.add("\n" + old + "} while( ");
 				this.addExpr(_g17,old);
-				this.buffer.b += " )";
+				this.add(" )");
 			} else {
-				this.buffer.b += "while( ";
+				this.add("while( ");
 				this.addExpr(_g17,tabs);
 				let old = tabs;
 				tabs += "\t";
-				this.buffer.b += Std.string(" ) {\n" + tabs);
+				this.add(" ) {\n" + tabs);
 				this.addExpr(_g16,tabs);
 				tabs = old;
-				this.buffer.b += Std.string("\n" + old + "}");
+				this.add("\n" + old + "}");
 			}
 			break;
 		case 20:
 			let _g18 = _g.e;
 			let _g19 = _g.args;
-			this.buffer.b += Std.string(_g.m);
+			this.add(_g.m);
 			if(_g19.length > 0) {
-				this.buffer.b += "(";
+				this.add("(");
 				let first = true;
 				let _g = 0;
 				while(_g < _g19.length) {
@@ -26757,13 +24603,13 @@ class hxsl_Printer {
 					if(first) {
 						first = false;
 					} else {
-						this.buffer.b += ", ";
+						this.add(", ");
 					}
 					this.addConst(c);
 				}
-				this.buffer.b += ")";
+				this.add(")");
 			}
-			this.buffer.b += " ";
+			this.add(" ");
 			this.addExpr(_g18,tabs);
 			break;
 		}
@@ -26839,10 +24685,10 @@ class hxsl_Printer {
 			let regVar = null;
 			regVar = function(v,reg) {
 				if(reg) {
-					if(vars.h.hasOwnProperty(v.id)) {
+					if(vars.exists(v.id)) {
 						throw haxe_Exception.thrown("Duplicate var " + v.id);
 					}
-					vars.h[v.id] = v;
+					vars.set(v.id,v);
 					regVars.push(v);
 				} else {
 					vars.remove(v.id);
@@ -26864,7 +24710,7 @@ class hxsl_Printer {
 				switch(_g._hx_index) {
 				case 1:
 					let _g1 = _g.v;
-					if(!vars.h.hasOwnProperty(_g1.id)) {
+					if(!vars.exists(_g1.id)) {
 						throw haxe_Exception.thrown("Unbound var " + _g1.name + "@" + _g1.id);
 					}
 					break;
@@ -26934,7 +24780,7 @@ class hxsl_Printer {
 			}
 		} catch( _g ) {
 			let _g1 = haxe_Exception.caught(_g).unwrap();
-			if(typeof(_g1) == "string") {
+			if(Std.isOfType(_g1,String)) {
 				let e = _g1;
 				let msg = e + "\n    in\n" + hxsl_Printer.shaderToString(s,true);
 				if(from != null) {
@@ -27005,6 +24851,9 @@ class hxsl_RuntimeShader {
 	constructor() {
 		this.id = hxsl_RuntimeShader.UID++;
 	}
+	hasGlobal(gid) {
+		return this.globals.exists(gid);
+	}
 }
 hxsl_RuntimeShader.__name__ = "hxsl.RuntimeShader";
 Object.assign(hxsl_RuntimeShader.prototype, {
@@ -27012,6 +24861,16 @@ Object.assign(hxsl_RuntimeShader.prototype, {
 });
 class hxsl_Serializer {
 	constructor() {
+	}
+	readArr(f) {
+		let _g = [];
+		let _g1 = 0;
+		let _g2 = this.readVarInt();
+		while(_g1 < _g2) {
+			++_g1;
+			_g.push(f());
+		}
+		return _g;
 	}
 	readVarInt() {
 		let b = this.input.readByte();
@@ -27022,6 +24881,9 @@ class hxsl_Serializer {
 			return this.input.readInt32();
 		}
 		return (b & 127) << 8 | this.input.readByte();
+	}
+	readID() {
+		return this.readVarInt();
 	}
 	readType() {
 		switch(this.input.readByte()) {
@@ -27037,10 +24899,10 @@ class hxsl_Serializer {
 			return hxsl_Type.TString;
 		case 5:
 			let bits = this.input.readByte();
-			let v = hxsl_Serializer.TVECS.h[bits];
+			let v = hxsl_Serializer.TVECS.get(bits);
 			if(v == null) {
 				v = hxsl_Type.TVec(bits & 7,Type.createEnumIndex(hxsl_VecType,bits >> 3,null));
-				hxsl_Serializer.TVECS.h[bits] = v;
+				hxsl_Serializer.TVECS.set(bits,v);
 			}
 			return v;
 		case 6:
@@ -27063,15 +24925,7 @@ class hxsl_Serializer {
 			if(t != null) {
 				return t;
 			}
-			let f = $bind(this,this.readVar);
-			let _g = [];
-			let _g1 = 0;
-			let _g2 = this.readVarInt();
-			while(_g1 < _g2) {
-				++_g1;
-				_g.push(f());
-			}
-			t = hxsl_Type.TStruct(_g);
+			t = hxsl_Type.TStruct(this.readArr($bind(this,this.readVar)));
 			this.types[id] = t;
 			return t;
 		case 14:
@@ -27113,6 +24967,7 @@ class hxsl_Serializer {
 	}
 	readExpr() {
 		let k = this.input.readByte();
+		let _gthis = this;
 		if(k-- == 0) {
 			return null;
 		}
@@ -27131,15 +24986,7 @@ class hxsl_Serializer {
 			e = hxsl_TExprDef.TParenthesis(this.readExpr());
 			break;
 		case 4:
-			let f = $bind(this,this.readExpr);
-			let _g = [];
-			let _g1 = 0;
-			let _g2 = this.readVarInt();
-			while(_g1 < _g2) {
-				++_g1;
-				_g.push(f());
-			}
-			e = hxsl_TExprDef.TBlock(_g);
+			e = hxsl_TExprDef.TBlock(this.readArr($bind(this,this.readExpr)));
 			break;
 		case 5:
 			let op = this.input.readByte();
@@ -27152,21 +24999,12 @@ class hxsl_Serializer {
 			e = hxsl_TExprDef.TVarDecl(this.readVar(),this.readExpr());
 			break;
 		case 8:
-			let e1 = this.readExpr();
-			let f1 = $bind(this,this.readExpr);
-			let _g3 = [];
-			let _g4 = 0;
-			let _g5 = this.readVarInt();
-			while(_g4 < _g5) {
-				++_g4;
-				_g3.push(f1());
-			}
-			e = hxsl_TExprDef.TCall(e1,_g3);
+			e = hxsl_TExprDef.TCall(this.readExpr(),this.readArr($bind(this,this.readExpr)));
 			break;
 		case 9:
-			let e2 = this.readExpr();
+			let e1 = this.readExpr();
 			let bits = this.input.readUInt16();
-			let swiz = hxsl_Serializer.TSWIZ.h[bits];
+			let swiz = hxsl_Serializer.TSWIZ.get(bits);
 			if(swiz == null) {
 				let _g = [];
 				let _g1 = 0;
@@ -27176,9 +25014,9 @@ class hxsl_Serializer {
 					_g.push(hxsl_Serializer.REGS[bits >> i * 2 + 2 & 3]);
 				}
 				swiz = _g;
-				hxsl_Serializer.TSWIZ.h[bits] = _g;
+				hxsl_Serializer.TSWIZ.set(bits,_g);
 			}
-			e = hxsl_TExprDef.TSwiz(e2,swiz);
+			e = hxsl_TExprDef.TSwiz(e1,swiz);
 			break;
 		case 10:
 			e = hxsl_TExprDef.TIf(this.readExpr(),this.readExpr(),this.readExpr());
@@ -27202,49 +25040,18 @@ class hxsl_Serializer {
 			e = hxsl_TExprDef.TArray(this.readExpr(),this.readExpr());
 			break;
 		case 17:
-			let f2 = $bind(this,this.readExpr);
-			let _g6 = [];
-			let _g7 = 0;
-			let _g8 = this.readVarInt();
-			while(_g7 < _g8) {
-				++_g7;
-				_g6.push(f2());
-			}
-			e = hxsl_TExprDef.TArrayDecl(_g6);
+			e = hxsl_TExprDef.TArrayDecl(this.readArr($bind(this,this.readExpr)));
 			break;
 		case 18:
-			let e3 = this.readExpr();
-			let _g9 = [];
-			let _g10 = 0;
-			let _g11 = this.readVarInt();
-			while(_g10 < _g11) {
-				++_g10;
-				let f = $bind(this,this.readExpr);
-				let _g = [];
-				let _g1 = 0;
-				let _g2 = this.readVarInt();
-				while(_g1 < _g2) {
-					++_g1;
-					_g.push(f());
-				}
-				_g9.push({ values : _g, expr : this.readExpr()});
-			}
-			e = hxsl_TExprDef.TSwitch(e3,_g9,this.readExpr());
+			e = hxsl_TExprDef.TSwitch(this.readExpr(),this.readArr(function() {
+				return { values : _gthis.readArr($bind(_gthis,_gthis.readExpr)), expr : _gthis.readExpr()};
+			}),this.readExpr());
 			break;
 		case 19:
 			e = hxsl_TExprDef.TWhile(this.readExpr(),this.readExpr(),this.input.readByte() != 0);
 			break;
 		case 20:
-			let e4 = this.readString();
-			let f3 = $bind(this,this.readConst);
-			let _g12 = [];
-			let _g13 = 0;
-			let _g14 = this.readVarInt();
-			while(_g13 < _g14) {
-				++_g13;
-				_g12.push(f3());
-			}
-			e = hxsl_TExprDef.TMeta(e4,_g12,this.readExpr());
+			e = hxsl_TExprDef.TMeta(this.readString(),this.readArr($bind(this,this.readConst)),this.readExpr());
 			break;
 		default:
 			throw haxe_Exception.thrown("assert");
@@ -27252,16 +25059,16 @@ class hxsl_Serializer {
 		return { e : e, t : this.readType(), p : null};
 	}
 	readVar() {
-		let id = this.readVarInt();
+		let id = this.readID();
 		if(id == 0) {
 			return null;
 		}
-		let v = this.varMap.h[id];
+		let v = this.varMap.get(id);
 		if(v != null) {
 			return v;
 		}
 		v = { id : hxsl_Tools.allocVarId(), name : this.readString(), type : null, kind : null};
-		this.varMap.h[id] = v;
+		this.varMap.set(id,v);
 		v.type = this.readType();
 		v.kind = hxsl_Serializer.VKINDS[this.input.readByte()];
 		v.parent = this.readVar();
@@ -27314,17 +25121,7 @@ class hxsl_Serializer {
 		return v;
 	}
 	readFun() {
-		let tmp = hxsl_Serializer.FKIND[this.input.readByte()];
-		let tmp1 = this.readVar();
-		let f = $bind(this,this.readVar);
-		let _g = [];
-		let _g1 = 0;
-		let _g2 = this.readVarInt();
-		while(_g1 < _g2) {
-			++_g1;
-			_g.push(f());
-		}
-		return { kind : tmp, ref : tmp1, args : _g, ret : this.readType(), expr : this.readExpr()};
+		return { kind : hxsl_Serializer.FKIND[this.input.readByte()], ref : this.readVar(), args : this.readArr($bind(this,this.readVar)), ret : this.readType(), expr : this.readExpr()};
 	}
 	unserialize(data) {
 		this.input = new haxe_io_BytesInput(haxe_crypto_Base64.decode(data,false));
@@ -27333,24 +25130,7 @@ class hxsl_Serializer {
 		}
 		this.varMap = new haxe_ds_IntMap();
 		this.types = [];
-		let tmp = this.readString();
-		let f = $bind(this,this.readVar);
-		let _g = [];
-		let _g1 = 0;
-		let _g2 = this.readVarInt();
-		while(_g1 < _g2) {
-			++_g1;
-			_g.push(f());
-		}
-		let f1 = $bind(this,this.readFun);
-		let _g3 = [];
-		let _g4 = 0;
-		let _g5 = this.readVarInt();
-		while(_g4 < _g5) {
-			++_g4;
-			_g3.push(f1());
-		}
-		return { name : tmp, vars : _g, funs : _g3};
+		return { name : this.readString(), vars : this.readArr($bind(this,this.readVar)), funs : this.readArr($bind(this,this.readFun))};
 	}
 }
 hxsl_Serializer.__name__ = "hxsl.Serializer";
@@ -27361,6 +25141,9 @@ class hxsl_ShaderList {
 	constructor(s,n) {
 		this.s = s;
 		this.next = n;
+	}
+	iterator() {
+		return new hxsl__$ShaderList_ShaderIterator(this,null);
 	}
 	static addSort(s,shaders) {
 		let prev = null;
@@ -27379,6 +25162,24 @@ class hxsl_ShaderList {
 hxsl_ShaderList.__name__ = "hxsl.ShaderList";
 Object.assign(hxsl_ShaderList.prototype, {
 	__class__: hxsl_ShaderList
+});
+class hxsl__$ShaderList_ShaderIterator {
+	constructor(l,last) {
+		this.l = l;
+		this.last = last;
+	}
+	hasNext() {
+		return this.l != this.last;
+	}
+	next() {
+		let s = this.l.s;
+		this.l = this.l.next;
+		return s;
+	}
+}
+hxsl__$ShaderList_ShaderIterator.__name__ = "hxsl._ShaderList.ShaderIterator";
+Object.assign(hxsl__$ShaderList_ShaderIterator.prototype, {
+	__class__: hxsl__$ShaderList_ShaderIterator
 });
 class hxsl_ShaderInstance {
 	constructor(shader) {
@@ -27432,6 +25233,14 @@ class hxsl_SharedShader {
 			this.browseVar(v);
 		}
 	}
+	getInstance(constBits) {
+		let i = this.instanceCache.get(constBits);
+		if(i == null) {
+			return this.makeInstance(constBits);
+		} else {
+			return i;
+		}
+	}
 	makeInstance(constBits) {
 		let $eval = new hxsl_Eval();
 		let c = this.consts;
@@ -27466,7 +25275,7 @@ class hxsl_SharedShader {
 			++_g;
 			this.addParam($eval,i,v);
 		}
-		this.instanceCache.h[constBits] = i;
+		this.instanceCache.set(constBits,i);
 		return i;
 	}
 	addParam($eval,i,v) {
@@ -27480,7 +25289,7 @@ class hxsl_SharedShader {
 				this.addParam($eval,i,v);
 			}
 		} else if(v.kind == hxsl_VarKind.Param) {
-			i.params.h[$eval.varMap.h[v.__id__].id] = this.paramsCount;
+			i.params.set($eval.varMap.get(v).id,this.paramsCount);
 			this.paramsCount++;
 		}
 	}
@@ -27574,7 +25383,7 @@ class hxsl_Splitter {
 			let v = inf.v;
 			switch(v.kind._hx_index) {
 			case 3:case 4:
-				v.kind = fvars.h.hasOwnProperty(v.id) ? hxsl_VarKind.Var : hxsl_VarKind.Local;
+				v.kind = fvars.exists(v.id) ? hxsl_VarKind.Var : hxsl_VarKind.Local;
 				break;
 			default:
 			}
@@ -27590,13 +25399,13 @@ class hxsl_Splitter {
 					this.addExpr(vfun,e);
 					this.checkExpr(e);
 					if(nv.kind == hxsl_VarKind.Var) {
-						let old = fvars.h[v.id];
+						let old = fvars.get(v.id);
 						this.varMap.set(v,nv);
 						fvars.remove(v.id);
 						let np = new hxsl__$Splitter_VarProps(nv);
 						np.read = old.read;
 						np.write = old.write;
-						fvars.h[nv.id] = np;
+						fvars.set(nv.id,np);
 					}
 				}
 				break;
@@ -27613,15 +25422,15 @@ class hxsl_Splitter {
 			case 1:
 				let nv = { id : hxsl_Tools.allocVarId(), name : v.name, kind : hxsl_VarKind.Var, type : v.type};
 				this.uniqueName(nv);
-				let i = vvars.h[v.id];
+				let i = vvars.get(v.id);
 				if(i == null) {
 					i = new hxsl__$Splitter_VarProps(v);
-					vvars.h[v.id] = i;
+					vvars.set(v.id,i);
 				}
 				i.read++;
 				let vp = new hxsl__$Splitter_VarProps(nv);
 				vp.write = 1;
-				vvars.h[nv.id] = vp;
+				vvars.set(nv.id,vp);
 				let fp = new hxsl__$Splitter_VarProps(nv);
 				fp.read = 1;
 				todo.push(fp);
@@ -27644,7 +25453,7 @@ class hxsl_Splitter {
 		while(_g4 < todo.length) {
 			let v = todo[_g4];
 			++_g4;
-			fvars.h[v.v.id] = v;
+			fvars.set(v.v.id,v);
 		}
 		let v = vvars.iterator();
 		while(v.hasNext()) {
@@ -27659,7 +25468,7 @@ class hxsl_Splitter {
 		let v2 = this.varMap.keys();
 		while(v2.hasNext()) {
 			let v = v2.next();
-			let v21 = this.varMap.h[this.varMap.h[v.__id__].__id__];
+			let v21 = this.varMap.get(this.varMap.get(v));
 			if(v21 != null) {
 				this.varMap.set(v,v21);
 			}
@@ -27714,7 +25523,7 @@ class hxsl_Splitter {
 		switch(v.v.kind._hx_index) {
 		case 3:
 			if(!vertex) {
-				let i = vvars.h[v.v.id];
+				let i = vvars.get(v.v.id);
 				if(i == null || i.write == 0) {
 					throw haxe_Exception.thrown(new hxsl_Error("Varying " + v.v.name + " is not written by vertex shader",p));
 				}
@@ -27732,7 +25541,7 @@ class hxsl_Splitter {
 		let _g = e.e;
 		switch(_g._hx_index) {
 		case 1:
-			let v2 = this.varMap.h[_g.v.__id__];
+			let v2 = this.varMap.get(_g.v);
 			if(v2 == null) {
 				return e;
 			} else {
@@ -27740,7 +25549,7 @@ class hxsl_Splitter {
 			}
 			break;
 		case 7:
-			let v21 = this.varMap.h[_g.v.__id__];
+			let v21 = this.varMap.get(_g.v);
 			if(v21 == null) {
 				return hxsl_Tools.map(e,$bind(this,this.mapVars));
 			} else {
@@ -27748,7 +25557,7 @@ class hxsl_Splitter {
 			}
 			break;
 		case 13:
-			let v22 = this.varMap.h[_g.v.__id__];
+			let v22 = this.varMap.get(_g.v);
 			if(v22 == null) {
 				return hxsl_Tools.map(e,$bind(this,this.mapVars));
 			} else {
@@ -27760,9 +25569,9 @@ class hxsl_Splitter {
 		}
 	}
 	get(v) {
-		let i = this.vars.h[v.id];
+		let i = this.vars.get(v.id);
 		if(i == null) {
-			let v2 = this.varMap.h[v.__id__];
+			let v2 = this.varMap.get(v);
 			if(v2 != null) {
 				return this.get(v2);
 			}
@@ -27775,7 +25584,7 @@ class hxsl_Splitter {
 				v = nv;
 			}
 			i = new hxsl__$Splitter_VarProps(v);
-			this.vars.h[v.id] = i;
+			this.vars.set(v.id,i);
 		}
 		return i;
 	}
@@ -27784,15 +25593,15 @@ class hxsl_Splitter {
 			return;
 		}
 		v.parent = null;
-		let n = this.varNames.h[v.name];
+		let n = this.varNames.get(v.name);
 		if(n != null && n != v) {
 			let prefix = v.name;
 			while(HxOverrides.cca(prefix,prefix.length - 1) >= 48 && HxOverrides.cca(prefix,prefix.length - 1) <= 57) prefix = HxOverrides.substr(prefix,0,-1);
 			let k = prefix == v.name ? 2 : Std.parseInt(HxOverrides.substr(v.name,prefix.length,null));
-			while(Object.prototype.hasOwnProperty.call(this.varNames.h,prefix + k)) ++k;
+			while(this.varNames.exists(prefix + k)) ++k;
 			v.name = prefix + k;
 		}
-		this.varNames.h[v.name] = v;
+		this.varNames.set(v.name,v);
 	}
 	checkExpr(e) {
 		let _g = e.e;
@@ -27889,6 +25698,21 @@ hxsl_Splitter.__name__ = "hxsl.Splitter";
 Object.assign(hxsl_Splitter.prototype, {
 	__class__: hxsl_Splitter
 });
+class hxsl_ChannelTools {
+	static isPackedFormat(c) {
+		return c.format == h3d_mat_Texture.nativeFormat;
+	}
+}
+hxsl_ChannelTools.__name__ = "hxsl.ChannelTools";
+class js_Lib {
+	static get_undefined() {
+		return undefined;
+	}
+	static getNextHaxeUID() {
+		return $global.$haxeUID++;
+	}
+}
+js_Lib.__name__ = "js.Lib";
 class js_html__$CanvasElement_CanvasUtil {
 	static getContextWebGL(canvas,attribs) {
 		let ctx = canvas.getContext("webgl",attribs);
@@ -27917,6 +25741,12 @@ if( String.fromCodePoint == null ) String.fromCodePoint = function(c) { return c
 	Array.__name__ = "Array";
 	Date.prototype.__class__ = Date;
 	Date.__name__ = "Date";
+	var Int = { };
+	var Dynamic = { };
+	var Float = Number;
+	var Bool = Boolean;
+	var Class = { };
+	var Enum = { };
 }
 haxe_ds_ObjectMap.count = 0;
 haxe_MainLoop.add(hxd_System.updateCursor,-1);
@@ -27978,7 +25808,7 @@ h3d_impl_GlDriver.CBUFFERS = (function($this) {
 	$r = _g;
 	return $r;
 }(this));
-h3d_impl_MemoryManager.ALL_FLAGS = h3d_BufferFlag.__empty_constructs__.slice();
+h3d_impl_MemoryManager.ALL_FLAGS = Type.allEnums(h3d_BufferFlag);
 h3d_mat_BaseMaterial._hx_skip_constructor = false;
 h3d_mat_Defaults.defaultKillAlphaThreshold = 0.5;
 h3d_mat_Defaults.loadingTextureColor = -65281;
@@ -28032,7 +25862,7 @@ hxd_Key.ALLOW_KEY_REPEAT = false;
 hxd_Timer.wantedFPS = 60.;
 hxd_Timer.maxDeltaTime = 0.5;
 hxd_Timer.smoothFactor = 0.95;
-hxd_Timer.lastTimeStamp = HxOverrides.now() / 1000;
+hxd_Timer.lastTimeStamp = haxe_Timer.stamp();
 hxd_Timer.elapsedTime = 0.;
 hxd_Timer.frameCount = 0;
 hxd_Timer.dt = 1 / hxd_Timer.wantedFPS;
@@ -28040,7 +25870,7 @@ hxd_Timer.currentDT = 1 / hxd_Timer.wantedFPS;
 hxd_System.setCursor = hxd_System.setNativeCursor;
 hxd_System.loopInit = false;
 hxsl_Tools.UID = 0;
-hxsl_Tools.SWIZ = hxsl_Component.__empty_constructs__.slice();
+hxsl_Tools.SWIZ = Type.allEnums(hxsl_Component);
 hxsl_Tools.MAX_CHANNELS_BITS = 3;
 hxsl_BatchShader.SRC = "HXSLEGh4c2wuQmF0Y2hTaGFkZXICAQtCYXRjaF9Db3VudAECAAEAAAABAAIMQmF0Y2hfQnVmZmVyEAUMAQIAAAA";
 hxsl_GlslOut.KWD_LIST = ["input","output","discard","dvec2","dvec3","dvec4","hvec2","hvec3","hvec4","fvec2","fvec3","fvec4","int","float","bool","long","short","double","half","fixed","unsigned","superp","lowp","mediump","highp","precision","invariant","discard","struct","asm","union","template","this","packed","goto","sizeof","namespace","noline","volatile","external","flat","input","output","out","attribute","const","uniform","varying","inout","void"];
@@ -28053,7 +25883,7 @@ hxsl_GlslOut.KWDS = (function($this) {
 		while(_g1 < _g2.length) {
 			let k = _g2[_g1];
 			++_g1;
-			_g.h[k] = true;
+			_g.set(k,true);
 		}
 	}
 	$r = _g;
@@ -28064,7 +25894,7 @@ hxsl_GlslOut.GLOBALS = (function($this) {
 	let m = new haxe_ds_EnumValueMap();
 	{
 		let _g = 0;
-		let _g1 = hxsl_TGlobal.__empty_constructs__.slice();
+		let _g1 = Type.allEnums(hxsl_TGlobal);
 		while(_g < _g1.length) {
 			let g = _g1[_g];
 			++_g;
@@ -28090,7 +25920,7 @@ hxsl_GlslOut.GLOBALS = (function($this) {
 		let g = m.iterator();
 		while(g.hasNext()) {
 			let g1 = g.next();
-			hxsl_GlslOut.KWDS.h[g1] = true;
+			hxsl_GlslOut.KWDS.set(g1,true);
 		}
 	}
 	$r = m;
@@ -28103,18 +25933,18 @@ hxsl_RuntimeShader.UID = 0;
 hxsl_Serializer.TVECS = new haxe_ds_IntMap();
 hxsl_Serializer.BOPS = (function($this) {
 	var $r;
-	let ops = haxe_macro_Binop.__empty_constructs__.slice();
-	ops.splice(haxe_macro_Binop.OpAssignOp(null)._hx_index,0,null);
+	let ops = Type.allEnums(haxe_macro_Binop);
+	ops.splice(Type.enumIndex(haxe_macro_Binop.OpAssignOp(null)),0,null);
 	$r = ops;
 	return $r;
 }(this));
-hxsl_Serializer.UNOPS = haxe_macro_Unop.__empty_constructs__.slice();
-hxsl_Serializer.TGLOBALS = hxsl_TGlobal.__empty_constructs__.slice();
+hxsl_Serializer.UNOPS = Type.allEnums(haxe_macro_Unop);
+hxsl_Serializer.TGLOBALS = Type.allEnums(hxsl_TGlobal);
 hxsl_Serializer.TSWIZ = new haxe_ds_IntMap();
 hxsl_Serializer.REGS = [hxsl_Component.X,hxsl_Component.Y,hxsl_Component.Z,hxsl_Component.W];
-hxsl_Serializer.VKINDS = hxsl_VarKind.__empty_constructs__.slice();
-hxsl_Serializer.PRECS = hxsl_Prec.__empty_constructs__.slice();
-hxsl_Serializer.FKIND = hxsl_FunctionKind.__empty_constructs__.slice();
+hxsl_Serializer.VKINDS = Type.allEnums(hxsl_VarKind);
+hxsl_Serializer.PRECS = Type.allEnums(hxsl_Prec);
+hxsl_Serializer.FKIND = Type.allEnums(hxsl_FunctionKind);
 hxsl_Serializer.SIGN = 9139229;
 hxsl_SharedShader.UNROLL_LOOPS = false;
 {
