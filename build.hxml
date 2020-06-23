@@ -1,0 +1,9 @@
+-cp src
+-D analyzer-optimize
+-main Main
+--debug
+--js bin/main.js
+-lib heaps
+-lib hxmath
+-lib random
+
