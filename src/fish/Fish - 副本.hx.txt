@@ -10,17 +10,13 @@ import hxmath.math.Vector2;
 import h2d.Drawable;
 import h2d.Graphics;
 
-class Fish  extends FishAbstract implements IUpdate {
-	
+class Fish extends FishAbstract implements IUpdate {
 	var g:Graphics;
-	
 
 	var s2d:Scene;
 	var g2:Graphics;
 
-var parent:Object;
-
-
+	var parent:Object;
 
 	/**
 	 * [Description]
@@ -32,19 +28,13 @@ var parent:Object;
 	 */
 	public function new(parent:Object, s2d:Scene, location:Vector2, r:Float, useServer:Bool = false) {
 		
-		this.parent=parent;
 		this.s2d = s2d;
-		super(location,r,s2d.width,s2d.height);
-		this.location2 = this.location = location;
+		super(location, r, s2d.width, s2d.height);
+        this.parent=parent;
 		// flock = new Flock(location.x, location.y, s2d.width, s2d.height, r);
-
-		flockSeek = new Flock(location.x, location.y, s2d.width, s2d.height, r);
-
-		binding();
 	}
 
 	override function createRender(r:Float) {
-		
 		var color = Std.int(0xFFFFFF * Math.random());
 		var pointa:Vector2 = new Vector2(0, 0);
 		var pointb:Vector2 = new Vector2(r / 2, r);
@@ -77,14 +67,7 @@ var parent:Object;
 		graphics.lineTo(pointa.x, pointa.y);
 		g2.endFill();
 	}
-	function binding() {
-		g.x = location.x;
-		g.y = location.y;
-		g2.x = location2.x;
-		g2.y = location2.y;
-	}
 
-	
 	override function syncLocation() {
 		g.x = location.x;
 		g.y = location.y;
@@ -92,20 +75,10 @@ var parent:Object;
 		g.rotation = flock.velocity.angle;
 	}
 
-	/**
-	 * 这里同步模拟坐标
-	 */
-	 override function syncShadowLocation(dir:Vector2) {
+	override function syncShadowLocation(dir:Vector2) {
 		g2.x = location2.x;
 		g2.y = location2.y;
 
 		g2.rotation = dir.angle; // what the fuck. 百分百同步了
 	}
-	
-
-
-
-
-
-	
 }

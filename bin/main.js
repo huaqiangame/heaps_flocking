@@ -549,63 +549,38 @@ class server_IUpdate {
 }
 server_IUpdate.__name__ = "server.IUpdate";
 server_IUpdate.__isInterface__ = true;
-class fish_Fish {
-	constructor(parent,s2d,location,r,useServer) {
-		if(useServer == null) {
-			useServer = false;
+class fish_FishAbstract {
+	constructor(location,r,width,height) {
+		if(fish_FishAbstract._hx_skip_constructor) {
+			return;
 		}
-		this.temp = 0;
-		this.s2d = s2d;
-		let this1 = new hxmath_math_Vector2Default(0.0,0.0);
-		this.acceleration = this1;
-		let this11 = new hxmath_math_Vector2Default(0.0,0.0);
-		this.velocity = this11;
-		let color = Std.int(16777215 * Math.random());
-		let this12 = new hxmath_math_Vector2Default(0,0);
-		let pointa = this12;
-		let this13 = new hxmath_math_Vector2Default(r / 2,r);
-		let pointb = this13;
-		let this14 = new hxmath_math_Vector2Default(0,2 * r);
-		let pointc = this14;
-		this.g = new h2d_Graphics(parent);
-		this.g.beginFill(color,0.1);
-		let graphics = this.g;
-		graphics.moveTo(pointa.x,pointa.y);
-		graphics.lineTo(pointb.x,pointb.y);
-		graphics.lineTo(pointc.x,pointc.y);
-		graphics.lineTo(pointa.x,pointa.y);
-		this.g.endFill();
-		this.g2 = new h2d_Graphics(parent);
-		this.g2.beginFill(color,0.5);
-		graphics = this.g2;
-		graphics.moveTo(pointa.x,pointa.y);
-		graphics.lineTo(pointb.x,pointb.y);
-		graphics.lineTo(pointc.x,pointc.y);
-		graphics.lineTo(pointa.x,pointa.y);
-		this.g2.endFill();
-		this.location2 = this.location = location;
-		this.flockSeek = new fish_Flock(location.x,location.y,s2d.width,s2d.height,r);
-		this.binding();
+		this._hx_constructor(location,r,width,height);
 	}
-	binding() {
-		this.g.set_x(this.location.x);
-		this.g.set_y(this.location.y);
-		this.g2.set_x(this.location2.x);
-		this.g2.set_y(this.location2.y);
+	_hx_constructor(location,r,width,height) {
+		this.temp = 0;
+		this.location2 = this.location = location;
+		this.flockSeek = new fish_Flock(location.x,location.y,width,height,r);
+		this.createRender(r);
+	}
+	createRender(r) {
+	}
+	syncLocation() {
+	}
+	syncShadowLocation(dir) {
 	}
 	update(dt) {
 		if(this.flock != null) {
 			this.location = this.flock.position;
-			this.g.set_x(this.location.x);
-			this.g.set_y(this.location.y);
-			let self = this.flock.velocity;
-			this.g.set_rotation(Math.atan2(self.y,self.x));
+			this.syncLocation();
 		}
-		if((this.temp += dt) >= Random.float(0.2,0.5)) {
+		if((this.temp += dt) >= Random.float(0.2,2)) {
 			this.tween(this.location);
 			this.temp = 0;
 		}
 		this.update2(dt);
+	}
+	tween(p) {
+		this.targetPos = p;
 	}
 	update2(dt) {
 		if(this.flockSeek != null && this.targetPos != null) {
@@ -623,18 +598,79 @@ class fish_Fish {
 			self1.x -= b1.x;
 			self1.y -= b1.y;
 			this.location2 = this.flock.position;
-			this.g2.set_x(this.location2.x);
-			this.g2.set_y(this.location2.y);
-			let self2 = self1;
-			this.g2.set_rotation(Math.atan2(self2.y,self2.x));
+			this.syncShadowLocation(self1);
 		}
 	}
-	tween(p) {
-		this.targetPos = p;
+}
+fish_FishAbstract.__name__ = "fish.FishAbstract";
+fish_FishAbstract.__interfaces__ = [server_IUpdate];
+Object.assign(fish_FishAbstract.prototype, {
+	__class__: fish_FishAbstract
+});
+class fish_Fish extends fish_FishAbstract {
+	constructor(parent,s2d,location,r,useServer) {
+		fish_FishAbstract._hx_skip_constructor = true;
+		super();
+		fish_FishAbstract._hx_skip_constructor = false;
+		this._hx_constructor(parent,s2d,location,r,useServer);
+	}
+	_hx_constructor(parent,s2d,location,r,useServer) {
+		if(useServer == null) {
+			useServer = false;
+		}
+		this.parent = parent;
+		this.s2d = s2d;
+		super._hx_constructor(location,r,s2d.width,s2d.height);
+		this.location2 = this.location = location;
+		this.flockSeek = new fish_Flock(location.x,location.y,s2d.width,s2d.height,r);
+		this.binding();
+	}
+	createRender(r) {
+		let color = Std.int(16777215 * Math.random());
+		let this1 = new hxmath_math_Vector2Default(0,0);
+		let pointa = this1;
+		let this11 = new hxmath_math_Vector2Default(r / 2,r);
+		let pointb = this11;
+		let this12 = new hxmath_math_Vector2Default(0,2 * r);
+		let pointc = this12;
+		this.g = new h2d_Graphics(this.parent);
+		this.g.beginFill(color,0.1);
+		let graphics = this.g;
+		graphics.moveTo(pointa.x,pointa.y);
+		graphics.lineTo(pointb.x,pointb.y);
+		graphics.lineTo(pointc.x,pointc.y);
+		graphics.lineTo(pointa.x,pointa.y);
+		this.g.endFill();
+		this.g2 = new h2d_Graphics(this.parent);
+		this.g2.beginFill(color,0.5);
+		graphics = this.g2;
+		graphics.moveTo(pointa.x,pointa.y);
+		graphics.lineTo(pointb.x,pointb.y);
+		graphics.lineTo(pointc.x,pointc.y);
+		graphics.lineTo(pointa.x,pointa.y);
+		this.g2.endFill();
+	}
+	binding() {
+		this.g.set_x(this.location.x);
+		this.g.set_y(this.location.y);
+		this.g2.set_x(this.location2.x);
+		this.g2.set_y(this.location2.y);
+	}
+	syncLocation() {
+		this.g.set_x(this.location.x);
+		this.g.set_y(this.location.y);
+		let self = this.flock.velocity;
+		this.g.set_rotation(Math.atan2(self.y,self.x));
+	}
+	syncShadowLocation(dir) {
+		this.g2.set_x(this.location2.x);
+		this.g2.set_y(this.location2.y);
+		this.g2.set_rotation(Math.atan2(dir.y,dir.x));
 	}
 }
 fish_Fish.__name__ = "fish.Fish";
 fish_Fish.__interfaces__ = [server_IUpdate];
+fish_Fish.__super__ = fish_FishAbstract;
 Object.assign(fish_Fish.prototype, {
 	__class__: fish_Fish
 });
@@ -670,17 +706,12 @@ class fish_Flock {
 	}
 	track(target,dir) {
 		let v = this.steek(target,false);
-		let angle = Math.atan2(v.y,v.x) * help_Mathf.Rad2Deg;
-		let dirAngle = Math.atan2(dir.y,dir.x) * help_Mathf.Rad2Deg;
 		let a = this.acceleration;
 		let this1 = new hxmath_math_Vector2Default(a.x,a.y);
 		let self = this1;
 		self.x += v.x;
 		self.y += v.y;
 		this.acceleration = self;
-		let self1 = this.acceleration;
-		let accAngle = Math.atan2(self1.y,self1.x) * help_Mathf.Rad2Deg;
-		haxe_Log.trace(angle,{ fileName : "src/fish/Flock.hx", lineNumber : 61, className : "fish.Flock", methodName : "track", customParams : [dirAngle,accAngle]});
 		this.update();
 	}
 	flock(boids) {
@@ -15235,9 +15266,6 @@ class help_Grid {
 	}
 }
 help_Grid.__name__ = "help.Grid";
-class help_Mathf {
-}
-help_Mathf.__name__ = "help.Mathf";
 class hxd_BitmapData {
 	constructor(width,height) {
 		if(!(width == -101 && height == -102)) {
@@ -25787,6 +25815,7 @@ haxe_MainLoop.add(hxd_System.updateCursor,-1);
 }
 js_Boot.__toStr = ({ }).toString;
 hxd_App._hx_skip_constructor = false;
+fish_FishAbstract._hx_skip_constructor = false;
 h2d_Object._hx_skip_constructor = false;
 h3d_impl_RenderContext._hx_skip_constructor = false;
 h3d_Buffer.GUID = 0;
@@ -25871,7 +25900,6 @@ haxe_EntryPoint.threadCount = 0;
 haxe_crypto_Base64.CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 haxe_crypto_Base64.BYTES = haxe_io_Bytes.ofString(haxe_crypto_Base64.CHARS);
 haxe_io_FPHelper.helper = new DataView(new ArrayBuffer(8));
-help_Mathf.Rad2Deg = 57.29578;
 hxd_Key.initDone = false;
 hxd_Key.keyPressed = [];
 hxd_Key.ALLOW_KEY_REPEAT = false;

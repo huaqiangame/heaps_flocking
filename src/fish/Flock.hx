@@ -58,7 +58,7 @@ class Flock {
 		acceleration += v;
 		var accAngle=acceleration.angle*Mathf.Rad2Deg;
 
-		trace(angle,dirAngle,accAngle);
+	//	trace(angle,dirAngle,accAngle);
 		this.update();
 	}
 
