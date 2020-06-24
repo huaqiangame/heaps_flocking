@@ -7,7 +7,7 @@ using fish.Vector2Helper;
 class Flock {
 	var acceleration:Vector2;
 
-	public  var velocity(default,null):Vector2;
+	public var velocity(default, null):Vector2;
 
 	public var position(default, null):Vector2;
 
@@ -23,11 +23,11 @@ class Flock {
 	var neighborDist:Float = 50; // 每个间隔。
 	var desiredSeperation:Float = 60; // 到达这个临界就分离。
 
-	public function new(x:Float, y:Float, width:Int, height:Int,r:Float) {
+	public function new(x:Float, y:Float, width:Int, height:Int, r:Float) {
 		acceleration = Vector2.zero;
 		velocity = new Vector2(Random.int(-1, 1), Random.int(-1, 1));
 
-		while (velocity.isZero()){
+		while (velocity.isZero()) {
 			velocity = new Vector2(Random.int(-1, 1), Random.int(-1, 1));
 		}
 		position = new Vector2(x, y);
@@ -36,8 +36,8 @@ class Flock {
 		maxForce = 0.05;
 		this.width = width;
 		this.height = height;
-		neighborDist=r<50?50:r+20;
-		desiredSeperation=r<35?35:r+5;
+		neighborDist = r < 50 ? 50 : r + 20;
+		desiredSeperation = r < 35 ? 35 : r + 5;
 	}
 
 	public function run(targets:Array<Flock>) {
@@ -45,6 +45,13 @@ class Flock {
 		this.update();
 		this.borders();
 		//  this.render();
+	}
+
+	public function track(target:Vector2) {
+		var v = steek(target, false);
+
+		acceleration += v;
+		this.update();
 	}
 
 	function flock(boids:Array<Flock>) {
@@ -81,7 +88,7 @@ class Flock {
 		if (count > 0) {
 			steer = steer / (count);
 		}
-		
+
 		if (!steer.isZero()) {
 			// Implement Reynolds: Steering = Desired - Velocity
 			steer.normalizeTo(this.maxSpeed);
@@ -124,7 +131,7 @@ class Flock {
 		// 	// This damping is somewhat arbitrary:
 		// 	desired.normalizeTo(this.maxSpeed * (distance / 100)); // 这里不一样。
 		// } else {
-		
+
 		// }
 		desired.normalizeTo(this.maxSpeed);
 		steer = desired - velocity;
@@ -161,8 +168,6 @@ class Flock {
 		// For every boid in the system, check if it's too close
 		// for (var i = 0, l = boids.length; i < l; i++) {
 		for (other in boids) {
-			
-			
 			// var other = boids[i];
 			var vector = position - other.position;
 			var distance = vector.length;

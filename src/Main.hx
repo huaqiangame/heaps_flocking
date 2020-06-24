@@ -20,14 +20,14 @@ class Main extends hxd.App {
 		engine.backgroundColor = 0xffffff;
 
 		var g = new Graphics(s2d);
-        var gap = 30;
+        var gap = 60;
 		var w = s2d.width+gap;
 		var h = s2d.height+gap;
 		
         Grid.drawGrid(Std.int(w / gap), Std.int(h / gap), gap, gap, g);
   
 
-		for (j in 0...100) {
+		for (j in 0...30) {
 			var fish:Fish = new Fish(s2d, s2d, new Vector2(Random.int(31, s2d.width - 35), Random.int(31, 35)), 30);
 			arr2.push(fish);
 			flocks.push(fish.flock);
