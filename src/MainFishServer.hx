@@ -22,7 +22,7 @@ class MainFishServer {
 	public function init() {
 		
 		var center:Vector2 = stage / 2;
-		for (j in 0...30) {
+		for (j in 0...100) {
 			var flock:Flock = new Flock(Random.float(center.x - 100, center.y - 100), Random.float(center.x + 100, center.y - 100), Std.int(stage.x),
 				Std.int(stage.y), 30);
 			flocks.push(flock);

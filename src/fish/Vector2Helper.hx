@@ -17,4 +17,6 @@ class Vector2Helper {
         return v2.x==0&&v2.y==0;
         
     }
+
+   
 }

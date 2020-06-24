@@ -10,7 +10,7 @@ import hxmath.math.Vector2;
 import h2d.Drawable;
 import h2d.Graphics;
 
-class Fish implements IUpdate{
+class Fish implements IUpdate {
 	var acceleration:Vector2;
 	var velocity:Vector2;
 	var g:Graphics;
@@ -76,8 +76,6 @@ class Fish implements IUpdate{
 		binding();
 	}
 
-	
-
 	function binding() {
 		g.x = location.x;
 		g.y = location.y;
@@ -105,8 +103,6 @@ class Fish implements IUpdate{
 		update2(dt);
 	}
 
-
-
 	/**
 	 * 模拟服务器发送，然后返回还原。
 	 * @param dt
@@ -114,15 +110,20 @@ class Fish implements IUpdate{
 	public function update2(dt:Float) {
 		if (flockSeek != null && targetPos != null) {
 			var dir = targetPos - location2;
-			flockSeek.track(targetPos);
+			flockSeek.track(targetPos,dir);
 
-		
+
+			dir=flock.position-location2;
 			location2 = flock.position;
 
 			g2.x = location2.x;
 			g2.y = location2.y;
-			
-			g2.rotation = flockSeek.velocity.angle;
+
+			g2.rotation=dir.angle;//what the fuck. 百分百同步了
+
+
+
+			//g2.rotation = flockSeek.velocity.angle;
 		}
 	}
 

@@ -1,3 +1,4 @@
+import help.Mathf;
 import h3d.Vector;
 import h2d.Tile;
 import h2d.Bitmap;
@@ -28,8 +29,6 @@ class Main extends hxd.App {
 
 		Grid.drawGrid(Std.int(w / gap), Std.int(h / gap), gap, gap, g);
 
-
-
 		ms = new MainFishServer();
 
 		ms.init();
@@ -39,7 +38,7 @@ class Main extends hxd.App {
 		for (f in flockArray) {
 			var fish:Fish = new Fish(s2d, s2d, f.position, 30);
 
-			fish.flock=f;
+			fish.flock = f;
 			arrFish.push(fish);
 		}
 	}
@@ -48,13 +47,46 @@ class Main extends hxd.App {
 		for (b in arr) {
 			b.update(dt);
 		}
-	
+
 		for (f in arrFish) {
 			f.update(dt);
 		}
 	}
 
+	static function test() {
+		
+		var a=new Vector2(0,1);
+		var b=new Vector2(-1,1);
+		var c=new Vector2(1,1);
+		
+
+		var rab=a.signedAngleWith(b);
+		var rac=a.signedAngleWith(c);
+
+		trace(rab*Mathf.Rad2Deg);
+
+		trace(rac*Mathf.Rad2Deg);
+
+
+		var aa=a.clone();
+		var bb=b.clone();
+		var cc=c.clone();
+
+		aa.rotate(rac,Vector2.zero);
+
+		trace(aa);
+
+		trace(aa.angle*Mathf.Rad2Deg);
+
+
+      trace(aa.normal==c.normal);
+	}
+
 	static function main() {
+
+
+		
+
 		new Main();
 	}
 }

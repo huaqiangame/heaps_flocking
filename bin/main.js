@@ -237,7 +237,7 @@ class MainFishServer {
 		self.x /= 2;
 		self.y /= 2;
 		let _g = 0;
-		while(_g < 30) {
+		while(_g < 100) {
 			++_g;
 			let flock = new fish_Flock(Random.float(self.x - 100,self.y - 100),Random.float(self.x + 100,self.y - 100),Std.int(this.stage.x),Std.int(this.stage.y),30);
 			this.flocks.push(flock);
@@ -558,15 +558,15 @@ class fish_Fish {
 		this.s2d = s2d;
 		let this1 = new hxmath_math_Vector2Default(0.0,0.0);
 		this.acceleration = this1;
-		let this2 = new hxmath_math_Vector2Default(0.0,0.0);
-		this.velocity = this2;
+		let this11 = new hxmath_math_Vector2Default(0.0,0.0);
+		this.velocity = this11;
 		let color = Std.int(16777215 * Math.random());
-		let this3 = new hxmath_math_Vector2Default(0,0);
-		let pointa = this3;
-		let this4 = new hxmath_math_Vector2Default(r / 2,r);
-		let pointb = this4;
-		let this5 = new hxmath_math_Vector2Default(0,2 * r);
-		let pointc = this5;
+		let this12 = new hxmath_math_Vector2Default(0,0);
+		let pointa = this12;
+		let this13 = new hxmath_math_Vector2Default(r / 2,r);
+		let pointb = this13;
+		let this14 = new hxmath_math_Vector2Default(0,2 * r);
+		let pointc = this14;
 		this.g = new h2d_Graphics(parent);
 		this.g.beginFill(color,0.1);
 		let graphics = this.g;
@@ -615,12 +615,18 @@ class fish_Fish {
 			let self = this1;
 			self.x -= b.x;
 			self.y -= b.y;
-			this.flockSeek.track(this.targetPos);
+			this.flockSeek.track(this.targetPos,self);
+			let a1 = this.flock.position;
+			let b1 = this.location2;
+			let this11 = new hxmath_math_Vector2Default(a1.x,a1.y);
+			let self1 = this11;
+			self1.x -= b1.x;
+			self1.y -= b1.y;
 			this.location2 = this.flock.position;
 			this.g2.set_x(this.location2.x);
 			this.g2.set_y(this.location2.y);
-			let self1 = this.flockSeek.velocity;
-			this.g2.set_rotation(Math.atan2(self1.y,self1.x));
+			let self2 = self1;
+			this.g2.set_rotation(Math.atan2(self2.y,self2.x));
 		}
 	}
 	tween(p) {
@@ -641,14 +647,14 @@ class fish_Flock {
 		this.extraSeparation = 2;
 		let this1 = new hxmath_math_Vector2Default(0.0,0.0);
 		this.acceleration = this1;
-		let this2 = new hxmath_math_Vector2Default(Random.int(-1,1),Random.int(-1,1));
-		this.velocity = this2;
+		let this11 = new hxmath_math_Vector2Default(Random.int(-1,1),Random.int(-1,1));
+		this.velocity = this11;
 		while(fish_Vector2Helper.isZero(this.velocity)) {
 			let this1 = new hxmath_math_Vector2Default(Random.int(-1,1),Random.int(-1,1));
 			this.velocity = this1;
 		}
-		let this3 = new hxmath_math_Vector2Default(x,y);
-		this.position = this3;
+		let this12 = new hxmath_math_Vector2Default(x,y);
+		this.position = this12;
 		this.r = r;
 		this.maxSpeed = 3;
 		this.maxForce = 0.05;
@@ -662,14 +668,19 @@ class fish_Flock {
 		this.update();
 		this.borders();
 	}
-	track(target) {
+	track(target,dir) {
 		let v = this.steek(target,false);
+		let angle = Math.atan2(v.y,v.x) * help_Mathf.Rad2Deg;
+		let dirAngle = Math.atan2(dir.y,dir.x) * help_Mathf.Rad2Deg;
 		let a = this.acceleration;
 		let this1 = new hxmath_math_Vector2Default(a.x,a.y);
 		let self = this1;
 		self.x += v.x;
 		self.y += v.y;
 		this.acceleration = self;
+		let self1 = this.acceleration;
+		let accAngle = Math.atan2(self1.y,self1.x) * help_Mathf.Rad2Deg;
+		haxe_Log.trace(angle,{ fileName : "src/fish/Flock.hx", lineNumber : 61, className : "fish.Flock", methodName : "track", customParams : [dirAngle,accAngle]});
 		this.update();
 	}
 	flock(boids) {
@@ -681,27 +692,27 @@ class fish_Flock {
 		self.y *= s;
 		let a1 = this.align(boids);
 		let s1 = this.extraAlign;
-		let this2 = new hxmath_math_Vector2Default(a1.x,a1.y);
-		let self1 = this2;
+		let this11 = new hxmath_math_Vector2Default(a1.x,a1.y);
+		let self1 = this11;
 		self1.x *= s1;
 		self1.y *= s1;
 		let a2 = this.cohesion(boids);
 		let s2 = this.extraCohesion;
-		let this3 = new hxmath_math_Vector2Default(a2.x,a2.y);
-		let self2 = this3;
+		let this12 = new hxmath_math_Vector2Default(a2.x,a2.y);
+		let self2 = this12;
 		self2.x *= s2;
 		self2.y *= s2;
 		let a3 = this.acceleration;
-		let this4 = new hxmath_math_Vector2Default(a3.x,a3.y);
-		let self3 = this4;
+		let this13 = new hxmath_math_Vector2Default(a3.x,a3.y);
+		let self3 = this13;
 		self3.x += self.x;
 		self3.y += self.y;
-		let this5 = new hxmath_math_Vector2Default(self3.x,self3.y);
-		let self4 = this5;
+		let this14 = new hxmath_math_Vector2Default(self3.x,self3.y);
+		let self4 = this14;
 		self4.x += self1.x;
 		self4.y += self1.y;
-		let this6 = new hxmath_math_Vector2Default(self4.x,self4.y);
-		let self5 = this6;
+		let this15 = new hxmath_math_Vector2Default(self4.x,self4.y);
+		let self5 = this15;
 		self5.x += self2.x;
 		self5.y += self2.y;
 		this.acceleration = self5;
@@ -717,14 +728,14 @@ class fish_Flock {
 		fish_Vector2Helper.limit(this.velocity,this.maxSpeed);
 		let a1 = this.position;
 		let b1 = this.velocity;
-		let this2 = new hxmath_math_Vector2Default(a1.x,a1.y);
-		let self1 = this2;
+		let this11 = new hxmath_math_Vector2Default(a1.x,a1.y);
+		let self1 = this11;
 		self1.x += b1.x;
 		self1.y += b1.y;
 		this.position = self1;
 		let a2 = this.acceleration;
-		let this3 = new hxmath_math_Vector2Default(a2.x,a2.y);
-		let self2 = this3;
+		let this12 = new hxmath_math_Vector2Default(a2.x,a2.y);
+		let self2 = this12;
 		self2.x *= 0;
 		self2.y *= 0;
 		this.acceleration = self2;
@@ -739,8 +750,8 @@ class fish_Flock {
 			++_g;
 			let b = other.position;
 			let self = this.position;
-			let this1 = new hxmath_math_Vector2Default(self.x,self.y);
-			let self1 = this1;
+			let this2 = new hxmath_math_Vector2Default(self.x,self.y);
+			let self1 = this2;
 			self1.x -= b.x;
 			self1.y -= b.y;
 			let self2 = self1;
@@ -804,8 +815,8 @@ class fish_Flock {
 			++_g;
 			let b = other.position;
 			let self = this.position;
-			let this1 = new hxmath_math_Vector2Default(self.x,self.y);
-			let self1 = this1;
+			let this2 = new hxmath_math_Vector2Default(self.x,self.y);
+			let self1 = this2;
 			self1.x -= b.x;
 			self1.y -= b.y;
 			let self2 = self1;
@@ -846,8 +857,8 @@ class fish_Flock {
 		self.x *= newLength;
 		self.y *= newLength;
 		let b1 = this.velocity;
-		let this2 = new hxmath_math_Vector2Default(self.x,self.y);
-		let self1 = this2;
+		let this11 = new hxmath_math_Vector2Default(self.x,self.y);
+		let self1 = this11;
 		self1.x -= b1.x;
 		self1.y -= b1.y;
 		fish_Vector2Helper.limit(self1,this.maxForce);
@@ -870,8 +881,8 @@ class fish_Flock {
 		if(position.y > this.height + radius) {
 			vector.y = -this.height - radius;
 		}
-		let this2 = new hxmath_math_Vector2Default(0.0,0.0);
-		if(vector != this2) {
+		let this11 = new hxmath_math_Vector2Default(0.0,0.0);
+		if(vector != this11) {
 			let a = this.position;
 			let this1 = new hxmath_math_Vector2Default(a.x,a.y);
 			let self = this1;
@@ -15224,6 +15235,9 @@ class help_Grid {
 	}
 }
 help_Grid.__name__ = "help.Grid";
+class help_Mathf {
+}
+help_Mathf.__name__ = "help.Mathf";
 class hxd_BitmapData {
 	constructor(width,height) {
 		if(!(width == -101 && height == -102)) {
@@ -25857,6 +25871,7 @@ haxe_EntryPoint.threadCount = 0;
 haxe_crypto_Base64.CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 haxe_crypto_Base64.BYTES = haxe_io_Bytes.ofString(haxe_crypto_Base64.CHARS);
 haxe_io_FPHelper.helper = new DataView(new ArrayBuffer(8));
+help_Mathf.Rad2Deg = 57.29578;
 hxd_Key.initDone = false;
 hxd_Key.keyPressed = [];
 hxd_Key.ALLOW_KEY_REPEAT = false;

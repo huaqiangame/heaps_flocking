@@ -1,5 +1,6 @@
 package fish;
 
+import help.Mathf;
 import hxmath.math.Vector2;
 
 using fish.Vector2Helper;
@@ -47,11 +48,33 @@ class Flock {
 		//  this.render();
 	}
 
-	public function track(target:Vector2) {
+	public function track(target:Vector2, dir:Vector2) {
+		
 		var v = steek(target, false);
 
+		var angle=v.angle*Mathf.Rad2Deg;
+		var dirAngle=dir.angle*Mathf.Rad2Deg;
+		
 		acceleration += v;
+		var accAngle=acceleration.angle*Mathf.Rad2Deg;
+
+		trace(angle,dirAngle,accAngle);
 		this.update();
+	}
+
+	function checkRoation(dir:Vector2) {
+		var rab = velocity.signedAngleWith(dir);
+		var deg = rab * Mathf.Rad2Deg;
+		var v = velocity.clone();
+		if (deg != 0) {
+			acceleration*=0;
+			v.rotate(rab, Vector2.zero);
+
+			trace(v);
+			if (!Math.isNaN(v.x)) {
+				velocity = v;
+			}
+		}
 	}
 
 	function flock(boids:Array<Flock>) {
@@ -67,7 +90,6 @@ class Flock {
 		velocity.limit(maxSpeed);
 		position += velocity;
 		acceleration *= 0;
-		
 	}
 
 	/**
