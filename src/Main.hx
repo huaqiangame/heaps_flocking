@@ -9,28 +9,38 @@ import fish.Ball;
 import hxmath.math.Vector2;
 import h2d.Drawable;
 import h2d.Graphics;
+import MainFishServer;
 
 class Main extends hxd.App {
 	var arr:Array<Ball> = [];
-	var arr2:Array<Fish> = [];
+	var arrFish:Array<Fish> = [];
 
 	var flocks:Array<Flock> = [];
+	var ms:MainFishServer;
 
 	override function init() {
 		engine.backgroundColor = 0xffffff;
 
 		var g = new Graphics(s2d);
-        var gap = 60;
-		var w = s2d.width+gap;
-		var h = s2d.height+gap;
-		
-        Grid.drawGrid(Std.int(w / gap), Std.int(h / gap), gap, gap, g);
-  
+		var gap = 60;
+		var w = s2d.width + gap;
+		var h = s2d.height + gap;
 
-		for (j in 0...30) {
-			var fish:Fish = new Fish(s2d, s2d, new Vector2(Random.int(31, s2d.width - 35), Random.int(31, 35)), 30);
-			arr2.push(fish);
-			flocks.push(fish.flock);
+		Grid.drawGrid(Std.int(w / gap), Std.int(h / gap), gap, gap, g);
+
+
+
+		ms = new MainFishServer();
+
+		ms.init();
+
+		var flockArray = ms.flocks;
+
+		for (f in flockArray) {
+			var fish:Fish = new Fish(s2d, s2d, f.position, 30);
+
+			fish.flock=f;
+			arrFish.push(fish);
 		}
 	}
 
@@ -38,12 +48,8 @@ class Main extends hxd.App {
 		for (b in arr) {
 			b.update(dt);
 		}
-
-		for (f in flocks) {
-			f.run(flocks);
-		}
-
-		for (f in arr2) {
+	
+		for (f in arrFish) {
 			f.update(dt);
 		}
 	}

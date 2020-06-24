@@ -1,21 +1,18 @@
 -cp src
 -D analyzer-optimize
 -dce full
--main Main
+-main MainFishServer.hx
 --debug
 
--lib heaps
+
 -lib hxmath
 -lib random
 -lib actuate
 
 -D no_inline
 
-
---each
--D js-es=6
---js bin/main.js
---next
 -hl bin/main.hl
+
+
 
 

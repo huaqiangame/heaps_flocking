@@ -67,6 +67,7 @@ class Flock {
 		velocity.limit(maxSpeed);
 		position += velocity;
 		acceleration *= 0;
+		
 	}
 
 	/**

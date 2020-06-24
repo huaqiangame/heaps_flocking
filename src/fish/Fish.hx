@@ -1,5 +1,6 @@
 package fish;
 
+import server.IUpdate;
 import h2d.Text;
 import haxe.Timer;
 import h2d.Scene;
@@ -9,7 +10,7 @@ import hxmath.math.Vector2;
 import h2d.Drawable;
 import h2d.Graphics;
 
-class Fish {
+class Fish implements IUpdate{
 	var acceleration:Vector2;
 	var velocity:Vector2;
 	var g:Graphics;
@@ -18,8 +19,8 @@ class Fish {
 	var s2d:Scene;
 	var g2:Graphics;
 
-	public var flockSeek(default, null):Flock;
-	public var flock(default, null):Flock;
+	public var flockSeek(default, default):Flock;
+	public var flock(default, default):Flock;
 
 	var location2:Vector2;
 	var lastLocation:Vector2 = Vector2.zero;
@@ -68,12 +69,14 @@ class Fish {
 		graphics.lineTo(pointa.x, pointa.y);
 		g2.endFill();
 		this.location2 = this.location = location;
-		flock = new Flock(location.x, location.y, s2d.width, s2d.height, r);
+		// flock = new Flock(location.x, location.y, s2d.width, s2d.height, r);
 
 		flockSeek = new Flock(location.x, location.y, s2d.width, s2d.height, r);
 
 		binding();
 	}
+
+	
 
 	function binding() {
 		g.x = location.x;
@@ -101,6 +104,8 @@ class Fish {
 
 		update2(dt);
 	}
+
+
 
 	/**
 	 * 模拟服务器发送，然后返回还原。

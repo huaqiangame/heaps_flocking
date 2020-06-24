@@ -172,8 +172,7 @@ class Main extends hxd_App {
 		this._hx_constructor();
 	}
 	_hx_constructor() {
-		this.flocks = [];
-		this.arr2 = [];
+		this.arrFish = [];
 		this.arr = [];
 		super._hx_constructor();
 	}
@@ -183,15 +182,16 @@ class Main extends hxd_App {
 		let w = this.s2d.width + 60;
 		let h = this.s2d.height + 60;
 		help_Grid.drawGrid(Std.int(w / 60),Std.int(h / 60),60,60,g);
+		this.ms = new MainFishServer();
+		this.ms.init();
+		let flockArray = this.ms.flocks;
 		let _g = 0;
-		while(_g < 30) {
+		while(_g < flockArray.length) {
+			let f = flockArray[_g];
 			++_g;
-			let fish = this.s2d;
-			let fish1 = this.s2d;
-			let this1 = new hxmath_math_Vector2Default(Random.int(31,this.s2d.width - 35),Random.int(31,35));
-			let fish2 = new fish_Fish(fish,fish1,this1,30);
-			this.arr2.push(fish2);
-			this.flocks.push(fish2.flock);
+			let fish = new fish_Fish(this.s2d,this.s2d,f.position,30);
+			fish.flock = f;
+			this.arrFish.push(fish);
 		}
 	}
 	update(dt) {
@@ -203,17 +203,10 @@ class Main extends hxd_App {
 			b.update(dt);
 		}
 		let _g2 = 0;
-		let _g3 = this.flocks;
+		let _g3 = this.arrFish;
 		while(_g2 < _g3.length) {
 			let f = _g3[_g2];
 			++_g2;
-			f.run(this.flocks);
-		}
-		let _g4 = 0;
-		let _g5 = this.arr2;
-		while(_g4 < _g5.length) {
-			let f = _g5[_g4];
-			++_g4;
 			f.update(dt);
 		}
 	}
@@ -225,6 +218,44 @@ Main.__name__ = "Main";
 Main.__super__ = hxd_App;
 Object.assign(Main.prototype, {
 	__class__: Main
+});
+class MainFishServer {
+	constructor() {
+		let this1 = new hxmath_math_Vector2Default(1920,1080);
+		this.stage = this1;
+		this.flocks = [];
+		haxe_MainLoop.add($bind(this,this.mainLoop));
+	}
+	mainLoop() {
+		server_GameTimer.update();
+		this.update(server_GameTimer.dt);
+	}
+	init() {
+		let a = this.stage;
+		let this1 = new hxmath_math_Vector2Default(a.x,a.y);
+		let self = this1;
+		self.x /= 2;
+		self.y /= 2;
+		let _g = 0;
+		while(_g < 30) {
+			++_g;
+			let flock = new fish_Flock(Random.float(self.x - 100,self.y - 100),Random.float(self.x + 100,self.y - 100),Std.int(this.stage.x),Std.int(this.stage.y),30);
+			this.flocks.push(flock);
+		}
+	}
+	update(dt) {
+		let _g = 0;
+		let _g1 = this.flocks;
+		while(_g < _g1.length) {
+			let f = _g1[_g];
+			++_g;
+			f.run(this.flocks);
+		}
+	}
+}
+MainFishServer.__name__ = "MainFishServer";
+Object.assign(MainFishServer.prototype, {
+	__class__: MainFishServer
 });
 Math.__name__ = "Math";
 class Random {
@@ -514,6 +545,10 @@ fish_Ball.__name__ = "fish.Ball";
 Object.assign(fish_Ball.prototype, {
 	__class__: fish_Ball
 });
+class server_IUpdate {
+}
+server_IUpdate.__name__ = "server.IUpdate";
+server_IUpdate.__isInterface__ = true;
 class fish_Fish {
 	constructor(parent,s2d,location,r,useServer) {
 		if(useServer == null) {
@@ -523,15 +558,15 @@ class fish_Fish {
 		this.s2d = s2d;
 		let this1 = new hxmath_math_Vector2Default(0.0,0.0);
 		this.acceleration = this1;
-		let this11 = new hxmath_math_Vector2Default(0.0,0.0);
-		this.velocity = this11;
+		let this2 = new hxmath_math_Vector2Default(0.0,0.0);
+		this.velocity = this2;
 		let color = Std.int(16777215 * Math.random());
-		let this12 = new hxmath_math_Vector2Default(0,0);
-		let pointa = this12;
-		let this13 = new hxmath_math_Vector2Default(r / 2,r);
-		let pointb = this13;
-		let this14 = new hxmath_math_Vector2Default(0,2 * r);
-		let pointc = this14;
+		let this3 = new hxmath_math_Vector2Default(0,0);
+		let pointa = this3;
+		let this4 = new hxmath_math_Vector2Default(r / 2,r);
+		let pointb = this4;
+		let this5 = new hxmath_math_Vector2Default(0,2 * r);
+		let pointc = this5;
 		this.g = new h2d_Graphics(parent);
 		this.g.beginFill(color,0.1);
 		let graphics = this.g;
@@ -549,7 +584,6 @@ class fish_Fish {
 		graphics.lineTo(pointa.x,pointa.y);
 		this.g2.endFill();
 		this.location2 = this.location = location;
-		this.flock = new fish_Flock(location.x,location.y,s2d.width,s2d.height,r);
 		this.flockSeek = new fish_Flock(location.x,location.y,s2d.width,s2d.height,r);
 		this.binding();
 	}
@@ -594,6 +628,7 @@ class fish_Fish {
 	}
 }
 fish_Fish.__name__ = "fish.Fish";
+fish_Fish.__interfaces__ = [server_IUpdate];
 Object.assign(fish_Fish.prototype, {
 	__class__: fish_Fish
 });
@@ -606,14 +641,14 @@ class fish_Flock {
 		this.extraSeparation = 2;
 		let this1 = new hxmath_math_Vector2Default(0.0,0.0);
 		this.acceleration = this1;
-		let this11 = new hxmath_math_Vector2Default(Random.int(-1,1),Random.int(-1,1));
-		this.velocity = this11;
+		let this2 = new hxmath_math_Vector2Default(Random.int(-1,1),Random.int(-1,1));
+		this.velocity = this2;
 		while(fish_Vector2Helper.isZero(this.velocity)) {
 			let this1 = new hxmath_math_Vector2Default(Random.int(-1,1),Random.int(-1,1));
 			this.velocity = this1;
 		}
-		let this12 = new hxmath_math_Vector2Default(x,y);
-		this.position = this12;
+		let this3 = new hxmath_math_Vector2Default(x,y);
+		this.position = this3;
 		this.r = r;
 		this.maxSpeed = 3;
 		this.maxForce = 0.05;
@@ -646,27 +681,27 @@ class fish_Flock {
 		self.y *= s;
 		let a1 = this.align(boids);
 		let s1 = this.extraAlign;
-		let this11 = new hxmath_math_Vector2Default(a1.x,a1.y);
-		let self1 = this11;
+		let this2 = new hxmath_math_Vector2Default(a1.x,a1.y);
+		let self1 = this2;
 		self1.x *= s1;
 		self1.y *= s1;
 		let a2 = this.cohesion(boids);
 		let s2 = this.extraCohesion;
-		let this12 = new hxmath_math_Vector2Default(a2.x,a2.y);
-		let self2 = this12;
+		let this3 = new hxmath_math_Vector2Default(a2.x,a2.y);
+		let self2 = this3;
 		self2.x *= s2;
 		self2.y *= s2;
 		let a3 = this.acceleration;
-		let this13 = new hxmath_math_Vector2Default(a3.x,a3.y);
-		let self3 = this13;
+		let this4 = new hxmath_math_Vector2Default(a3.x,a3.y);
+		let self3 = this4;
 		self3.x += self.x;
 		self3.y += self.y;
-		let this14 = new hxmath_math_Vector2Default(self3.x,self3.y);
-		let self4 = this14;
+		let this5 = new hxmath_math_Vector2Default(self3.x,self3.y);
+		let self4 = this5;
 		self4.x += self1.x;
 		self4.y += self1.y;
-		let this15 = new hxmath_math_Vector2Default(self4.x,self4.y);
-		let self5 = this15;
+		let this6 = new hxmath_math_Vector2Default(self4.x,self4.y);
+		let self5 = this6;
 		self5.x += self2.x;
 		self5.y += self2.y;
 		this.acceleration = self5;
@@ -682,14 +717,14 @@ class fish_Flock {
 		fish_Vector2Helper.limit(this.velocity,this.maxSpeed);
 		let a1 = this.position;
 		let b1 = this.velocity;
-		let this11 = new hxmath_math_Vector2Default(a1.x,a1.y);
-		let self1 = this11;
+		let this2 = new hxmath_math_Vector2Default(a1.x,a1.y);
+		let self1 = this2;
 		self1.x += b1.x;
 		self1.y += b1.y;
 		this.position = self1;
 		let a2 = this.acceleration;
-		let this12 = new hxmath_math_Vector2Default(a2.x,a2.y);
-		let self2 = this12;
+		let this3 = new hxmath_math_Vector2Default(a2.x,a2.y);
+		let self2 = this3;
 		self2.x *= 0;
 		self2.y *= 0;
 		this.acceleration = self2;
@@ -704,8 +739,8 @@ class fish_Flock {
 			++_g;
 			let b = other.position;
 			let self = this.position;
-			let this2 = new hxmath_math_Vector2Default(self.x,self.y);
-			let self1 = this2;
+			let this1 = new hxmath_math_Vector2Default(self.x,self.y);
+			let self1 = this1;
 			self1.x -= b.x;
 			self1.y -= b.y;
 			let self2 = self1;
@@ -769,8 +804,8 @@ class fish_Flock {
 			++_g;
 			let b = other.position;
 			let self = this.position;
-			let this2 = new hxmath_math_Vector2Default(self.x,self.y);
-			let self1 = this2;
+			let this1 = new hxmath_math_Vector2Default(self.x,self.y);
+			let self1 = this1;
 			self1.x -= b.x;
 			self1.y -= b.y;
 			let self2 = self1;
@@ -811,8 +846,8 @@ class fish_Flock {
 		self.x *= newLength;
 		self.y *= newLength;
 		let b1 = this.velocity;
-		let this11 = new hxmath_math_Vector2Default(self.x,self.y);
-		let self1 = this11;
+		let this2 = new hxmath_math_Vector2Default(self.x,self.y);
+		let self1 = this2;
 		self1.x -= b1.x;
 		self1.y -= b1.y;
 		fish_Vector2Helper.limit(self1,this.maxForce);
@@ -835,8 +870,8 @@ class fish_Flock {
 		if(position.y > this.height + radius) {
 			vector.y = -this.height - radius;
 		}
-		let this11 = new hxmath_math_Vector2Default(0.0,0.0);
-		if(vector != this11) {
+		let this2 = new hxmath_math_Vector2Default(0.0,0.0);
+		if(vector != this2) {
 			let a = this.position;
 			let this1 = new hxmath_math_Vector2Default(a.x,a.y);
 			let self = this1;
@@ -25678,6 +25713,24 @@ class js_html__$CanvasElement_CanvasUtil {
 }
 js_html__$CanvasElement_CanvasUtil.__name__ = "js.html._CanvasElement.CanvasUtil";
 Math.__name__ = "Math";
+class server_GameTimer {
+	static update() {
+		server_GameTimer.frameCount++;
+		let newTime = haxe_Timer.stamp();
+		server_GameTimer.elapsedTime = newTime - server_GameTimer.lastTimeStamp;
+		server_GameTimer.lastTimeStamp = newTime;
+		if(server_GameTimer.elapsedTime < server_GameTimer.maxDeltaTime) {
+			server_GameTimer.currentDT = server_GameTimer.lerp(server_GameTimer.elapsedTime,server_GameTimer.currentDT,server_GameTimer.smoothFactor);
+		} else {
+			server_GameTimer.elapsedTime = 1 / server_GameTimer.wantedFPS;
+		}
+		server_GameTimer.dt = server_GameTimer.currentDT;
+	}
+	static lerp(a,b,k) {
+		return a + k * (b - a);
+	}
+}
+server_GameTimer.__name__ = "server.GameTimer";
 function $getIterator(o) { if( o instanceof Array ) return new haxe_iterators_ArrayIterator(o); else return o.iterator(); }
 function $bind(o,m) { if( m == null ) return null; if( m.__id__ == null ) m.__id__ = $global.$haxeUID++; var f; if( o.hx__closures__ == null ) o.hx__closures__ = {}; else f = o.hx__closures__[m.__id__]; if( f == null ) { f = m.bind(o); o.hx__closures__[m.__id__] = f; } return f; }
 $global.$haxeUID |= 0;
@@ -25895,6 +25948,14 @@ hxsl_Serializer.PRECS = Type.allEnums(hxsl_Prec);
 hxsl_Serializer.FKIND = Type.allEnums(hxsl_FunctionKind);
 hxsl_Serializer.SIGN = 9139229;
 hxsl_SharedShader.UNROLL_LOOPS = false;
+server_GameTimer.wantedFPS = 60.;
+server_GameTimer.maxDeltaTime = 0.5;
+server_GameTimer.smoothFactor = 0.95;
+server_GameTimer.lastTimeStamp = haxe_Timer.stamp();
+server_GameTimer.elapsedTime = 0.;
+server_GameTimer.frameCount = 0;
+server_GameTimer.dt = 1 / server_GameTimer.wantedFPS;
+server_GameTimer.currentDT = 1 / server_GameTimer.wantedFPS;
 {
 	Main.main();
 	haxe_EntryPoint.run();
