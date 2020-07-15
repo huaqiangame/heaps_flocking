@@ -12,10 +12,8 @@
 -D no_inline
 
 
---each
--D js-es=6
+
 --js bin/main.js
---next
--hl bin/main.hl
+
 
 
